@@ -51,7 +51,7 @@ Pass the URI you wish to run, as well as the full path to the executable that sh
 
 
 ```csharp
- var test = await WardenProcess.StartUri("steam://run/107410", "G:\\Games\\steamapps\\common\\Arma 3\\arma3launcher.exe", string.Empty);
+ var test = await WardenProcess.StartUri("steam://run/107410", "G:/Games/steamapps/common/Arma 3/arma3launcher.exe", string.Empty);
 ```
 
 Finally, you can build a Warden process tree from an already running process like so
