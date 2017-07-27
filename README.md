@@ -2,7 +2,7 @@
 
 ## What Is It?
 
-Warden is a simple to use library for managing processes and their states. 
+Warden.NET is a simple to use library for managing processes and their states. 
 
 ## Why?
 
@@ -16,7 +16,11 @@ The ```System.Diagnostics.Process``` class while useful does not have a concept 
 
 ### Installing
 
-TODO Nuget
+Via Nuget
+
+```
+Install-Package Warden.NET
+```
 
 ### Initializing Warden 
 To initialize Warden inside your application, call the static initialization function. (Pass ```true``` if you'd like Warden to kill all monitored processes on exit.)
