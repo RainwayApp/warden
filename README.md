@@ -42,7 +42,7 @@ var process = await WardenProcess.Start("G:/Games/steamapps/common/NieRAutomata/
 Similarly, you can launch a UWP like so.
 
 ```csharp
- var process = await WardenProcess.Launch("Microsoft.Halo5Forge_8wekyb3d8bbwe", "!Ausar", ProcessTypes.Uwp);
+ var process = await WardenProcess.Start("Microsoft.Halo5Forge_8wekyb3d8bbwe", "!Ausar", ProcessTypes.Uwp);
 ```
 
 If you need to start a URI, that is also supported. 
