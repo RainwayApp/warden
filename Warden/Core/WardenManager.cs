@@ -152,7 +152,7 @@ namespace Warden.Core
                   
                     if (managed.AddChild(CreateProcessFromId(processName, managed.Id, processId)))
                     {
-                        //Console.WriteLine($"Added child {processId} to root process " + managed.Id);
+                      //  Console.WriteLine($"Added child {processName}({processId}) to root process {managed.Name}({managed.Id})");
                         break;
                     }
                 }
@@ -163,7 +163,7 @@ namespace Warden.Core
                 }
                 if (child.AddChild(CreateProcessFromId(processName, child.Id, processId)))
                 {
-                   // Console.WriteLine($"Added child process {processId} to child" + child.Id);
+                   // Console.WriteLine($"Added child process {processName}({processId}) to child {child.Name}({child.Id})");
                     break;
                 }
             }

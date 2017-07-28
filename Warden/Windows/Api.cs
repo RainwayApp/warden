@@ -45,8 +45,6 @@ namespace Warden.Windows
                 }
             });
         }
-
-
         [DllImport("Kernel32")]
         internal static extern bool SetConsoleCtrlHandler(HandlerRoutine handler, bool add);
 

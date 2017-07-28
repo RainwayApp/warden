@@ -42,7 +42,12 @@ namespace Warden.Core
             Arguments = arguments;
             Type = uwp;
             Children = new ObservableCollection<WardenProcess>();
+            long epochTicks = new DateTime(1970, 1, 1).Ticks;
+            long unixTime = ((DateTime.UtcNow.Ticks - epochTicks) / TimeSpan.TicksPerSecond);
+            TimeStamp = unixTime;
         }
+
+        public long TimeStamp { get; set; }
 
         public ProcessTypes Type { get; }
 
@@ -399,15 +404,15 @@ namespace Warden.Core
         /// <returns>A WardenProcess that will be added to a child list.</returns>
         internal static WardenProcess CreateProcessFromId(string name, int parentId, int id)
         {
+            var path = ProcessUtils.GetProcessPath(id);
+            var arguments = ProcessUtils.GetCommandLine(id);
             WardenProcess warden;
             try
             {
                 var process = Process.GetProcessById(id);
                 var processName = process.ProcessName;
                 var processId = process.Id;
-                var path = ProcessUtils.GetProcessPath(processId);
                 var state = process.HasExited ? ProcessState.Dead : ProcessState.Alive;
-                var arguments = ProcessUtils.GetCommandLine(processId);
                 warden = new WardenProcess(processName, processId, path, state, arguments, ProcessTypes.Win32);
                 warden.SetParent(parentId);
                 return warden;
@@ -416,7 +421,7 @@ namespace Warden.Core
             {
               //
             }
-            warden = new WardenProcess(name, id, string.Empty, ProcessState.Dead, string.Empty, ProcessTypes.Win32);
+            warden = new WardenProcess(name, id, path, ProcessState.Dead, arguments, ProcessTypes.Win32);
             warden.SetParent(parentId);
             return warden;
         }
