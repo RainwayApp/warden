@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Management;
 using Warden.Core.Exceptions;
 using Warden.Core.Utils;
@@ -45,6 +46,23 @@ namespace Warden.Core
                 throw new WardenException(ex.Message);
             }
         }
+        /// <summary>
+        /// Flushes a top level process.
+        /// </summary>
+        /// <param name="processId"></param>
+        public static void Flush(int processId)
+        {
+            try
+            {
+                var key = ManagedProcesses.FirstOrDefault(x => x.Value.Id == processId).Key;
+                ManagedProcesses.TryRemove(key, out WardenProcess _);
+            }
+            catch 
+            {
+                //
+            }
+        }
+
 
         /// <summary>
         /// Fired when a process dies.
