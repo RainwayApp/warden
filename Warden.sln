@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26430.16
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warden", "Warden\Warden.csproj", "{69BD1AC4-362A-41D0-8E84-A76064D90B4B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WardenExample", "WardenExample\WardenExample.csproj", "{530B768D-96F9-4538-A54B-E8819212D8F8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Warden.Tests", "Warden.Tests\Warden.Tests.csproj", "{DA0B8298-92F8-4AC0-A923-68A82C45E0DF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{530B768D-96F9-4538-A54B-E8819212D8F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{530B768D-96F9-4538-A54B-E8819212D8F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{530B768D-96F9-4538-A54B-E8819212D8F8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA0B8298-92F8-4AC0-A923-68A82C45E0DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA0B8298-92F8-4AC0-A923-68A82C45E0DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA0B8298-92F8-4AC0-A923-68A82C45E0DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA0B8298-92F8-4AC0-A923-68A82C45E0DF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
