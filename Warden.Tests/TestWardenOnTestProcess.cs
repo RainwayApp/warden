@@ -41,7 +41,7 @@ namespace Warden.Tests
     {
       var expected = new List<string>( new[] { "cmd" } );
       var actual = new List<string>();
-      _currentProcess.OnChildStateChange += ( s, e ) => actual.Add( Process.GetProcessById( e.Id ).ProcessName );
+      _currentProcess.OnChildStateChange += ( s, e ) => actual.Add( _currentProcess.FindChildById( e.Id ).Name );
       Thread.Sleep( 1000 );
       Process.Start( "cmd" );
       Thread.Sleep( 1000 );

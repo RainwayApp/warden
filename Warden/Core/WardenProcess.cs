@@ -74,6 +74,17 @@ namespace Warden.Core
             ParentId = parentId;
         }
 
+
+        /// <summary>
+        /// Finds a child process by its id
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns>The WardenProcess of the child.</returns>
+        public WardenProcess FindChildById(int id)
+        {
+            return FindChildById(id, Children);
+        }
+
         /// <summary>
         /// Adds a child to a collection.
         /// </summary>
@@ -345,9 +356,14 @@ namespace Warden.Core
                 {
                     return child;
                 }
-                if (child.Children != null)
+                if (child.Children == null)
                 {
-                    return FindChildById(id, child.Children);
+                    continue;
+                }
+                var nested = FindChildById(id, child.Children);
+                if (nested != null)
+                {
+                    return nested;
                 }
             }
             return null;
