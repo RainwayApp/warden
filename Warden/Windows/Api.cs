@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
+using Warden.Properties;
 
 namespace Warden.Windows
 {
@@ -41,7 +42,7 @@ namespace Warden.Windows
                 }
                 catch (Exception e)
                 {
-                    throw new WardenLaunchException($"Error while trying to launch your app: {e.Message}");
+                    throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App, e.Message));
                 }
             });
         }

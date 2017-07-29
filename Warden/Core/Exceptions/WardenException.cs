@@ -28,7 +28,7 @@ namespace Warden.Core.Exceptions
         protected WardenException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            ResourceReferenceProperty = info.GetString("ResourceReferenceProperty");
+            ResourceReferenceProperty = info.GetString(WardenExceptionStrings.ResourceReferenceProperty);
         }
 
         public string ResourceReferenceProperty { get; set; }
@@ -40,7 +40,7 @@ namespace Warden.Core.Exceptions
             {
                 throw new ArgumentNullException(nameof(info));
             }
-            info.AddValue("ResourceReferenceProperty", ResourceReferenceProperty);
+            info.AddValue(WardenExceptionStrings.ResourceReferenceProperty, ResourceReferenceProperty);
             base.GetObjectData(info, context);
         }
     }

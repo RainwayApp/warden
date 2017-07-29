@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
 using Warden.Windows;
+using Warden.Properties;
 
 namespace Warden.Core.Launchers
 {
@@ -16,7 +17,7 @@ namespace Warden.Core.Launchers
             var pId = await Api.LaunchUwpApp($"{path}{arguments}");
             if (pId <= 0)
             {
-                throw new WardenLaunchException($"Could not find process id for {path}");
+                throw new WardenLaunchException(string.Format(Resources.Exception_Could_Not_Find_Process_Id, path));
             }
             var pName = string.Empty;
             ProcessState state;

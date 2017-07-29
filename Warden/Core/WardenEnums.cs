@@ -8,14 +8,14 @@ namespace Warden.Core
 {
     public enum ProcessState
     {
-        Alive,
-        Dead
+        Alive = 0,
+        Dead = 1
     }
 
     public enum ProcessTypes
     {
-        Win32,
-        Uwp,
-        Uri
+        Win32 = 0,
+        Uwp = 1,
+        Uri = 2
     }
 }
