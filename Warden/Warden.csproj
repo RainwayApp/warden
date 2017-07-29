@@ -57,5 +57,8 @@
   <ItemGroup>
     <Folder Include="Core\Models\" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include=".editorconfig" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

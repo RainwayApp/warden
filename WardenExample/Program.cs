@@ -17,12 +17,8 @@ using Warden.Core.Utils;
 
 namespace WardenExample
 {
-    
-
     class Program
     {
-
-       
         static void Main(string[] args)
         {
             Start();
@@ -32,9 +28,7 @@ namespace WardenExample
 
         private static async void Start()
         {
-
-          
-             WardenManager.Initialize();
+            WardenManager.Initialize();
             Console.Write("Enter the process ID: ");
             var processId = int.Parse(Console.ReadLine());
             var test = WardenProcess.GetProcessFromId(processId);
@@ -63,6 +57,5 @@ namespace WardenExample
                 };
             }*/
         }
-
     }
 }

@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 namespace Warden.Core
 {
-
     public enum ProcessState
     {
         Alive,

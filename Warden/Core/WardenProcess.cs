@@ -74,7 +74,6 @@ namespace Warden.Core
             ParentId = parentId;
         }
 
-
         /// <summary>
         /// Finds a child process by its id
         /// </summary>
@@ -124,7 +123,6 @@ namespace Warden.Core
             }
         }
 
-
         /// <summary>
         /// This event is fired when the process state has changed.
         /// </summary>
@@ -155,6 +153,7 @@ namespace Warden.Core
                 RefreshChildren(Children);
             }
         }
+
         /// <summary>
         /// Updates the children of a process.
         /// </summary>
@@ -196,6 +195,7 @@ namespace Warden.Core
             }
             return Children != null && CheckChildren(Children);
         }
+
         /// <summary>
         /// Checks if any of the children are alive.
         /// </summary>
@@ -237,17 +237,18 @@ namespace Warden.Core
                 {
                     process.Kill();
                     process.WaitForExit();
-                } 
+                }
             }
-            catch 
+            catch
             {
-               //
+                //
             }
             if (Children != null)
             {
                 KillChildren(Children);
             }
         }
+
         /// <summary>
         /// Loops over the tree killing all children
         /// </summary>
@@ -275,6 +276,7 @@ namespace Warden.Core
                 }
             }
         }
+
         #region static class
 
 
@@ -303,7 +305,7 @@ namespace Warden.Core
         }
 
         /// <summary>
-        /// Starts a Warden process using the applications full path. 
+        /// Starts a Warden process using the applications full path.
         /// This method can handle both Win32 applications and UWP.
         /// </summary>
         /// <param name="path">The full path of the executable or UWP family package name</param>
@@ -339,7 +341,7 @@ namespace Warden.Core
 
 
         /// <summary>
-        /// Finds a process in the tree using recursion 
+        /// Finds a process in the tree using recursion
         /// </summary>
         /// <param name="id"></param>
         /// <param name="children"></param>
@@ -385,7 +387,7 @@ namespace Warden.Core
             ManagedProcesses[key] = process;
             return ManagedProcesses[key];
         }
-     
+
         private static WardenProcess BuildTreeById(int pId)
         {
             try
@@ -433,9 +435,9 @@ namespace Warden.Core
                 warden.SetParent(parentId);
                 return warden;
             }
-            catch 
+            catch
             {
-              //
+                //
             }
             warden = new WardenProcess(name, id, path, ProcessState.Dead, arguments, ProcessTypes.Win32);
             warden.SetParent(parentId);
