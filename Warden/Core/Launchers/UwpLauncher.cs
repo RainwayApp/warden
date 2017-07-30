@@ -28,7 +28,7 @@ namespace Warden.Core.Launchers
             }
             catch (Exception)
             {
-               state = ProcessState.Dead;
+                state = ProcessState.Dead;
             }
             return new WardenProcess(pName, pId, path, state, arguments, ProcessTypes.Uwp);
         }

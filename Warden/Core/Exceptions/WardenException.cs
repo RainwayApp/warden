@@ -38,7 +38,7 @@ namespace Warden.Core.Exceptions
         {
             if (info == null)
             {
-                throw new ArgumentNullException("info");
+                throw new ArgumentNullException(nameof(info));
             }
             info.AddValue("ResourceReferenceProperty", ResourceReferenceProperty);
             base.GetObjectData(info, context);

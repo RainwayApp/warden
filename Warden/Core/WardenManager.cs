@@ -14,8 +14,7 @@ namespace Warden.Core
         private static ManagementEventWatcher _processStartEvent;
         private static ManagementEventWatcher _processStopEvent;
 
-        public static ConcurrentDictionary<Guid, WardenProcess> ManagedProcesses =
-            new ConcurrentDictionary<Guid, WardenProcess>();
+        public static ConcurrentDictionary<Guid, WardenProcess> ManagedProcesses = new ConcurrentDictionary<Guid, WardenProcess>();
 
         public static bool Initialized;
         private static bool _killTressOnExit;
@@ -64,7 +63,6 @@ namespace Warden.Core
                 //
             }
         }
-
 
         /// <summary>
         ///     Fired when a process dies.

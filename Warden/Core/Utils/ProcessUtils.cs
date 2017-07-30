@@ -9,21 +9,18 @@ using System.Threading.Tasks;
 
 namespace Warden.Core.Utils
 {
-   internal static class ProcessUtils
-   {
+    internal static class ProcessUtils
+    {
+        public static bool IsWindowsApp(string path)
+        {
+            return path.Contains("WindowsApps");
+        }
 
-
-
-       public static bool IsWindowsApp(string path)
-       {
-           return path.Contains("WindowsApps");
-       }
-
-       public static IEnumerable<Process> GetChildProcesses(int id)
-       {
-           var mos = new ManagementObjectSearcher($"Select * From Win32_Process Where ParentProcessID={id}");
-           return (from ManagementObject mo in mos.Get() select Process.GetProcessById(Convert.ToInt32(mo["ProcessID"]))).ToList();
-       }
+        public static IEnumerable<Process> GetChildProcesses(int id)
+        {
+            var mos = new ManagementObjectSearcher($"Select * From Win32_Process Where ParentProcessID={id}");
+            return (from ManagementObject mo in mos.Get() select Process.GetProcessById(Convert.ToInt32(mo["ProcessID"]))).ToList();
+        }
 
 
         public static string GetCommandLine(int id)
@@ -50,7 +47,6 @@ namespace Warden.Core.Utils
             arguments = string.Join(" ", split);
             return arguments;
         }
-
 
         public static string GetProcessPath(int processId)
         {
