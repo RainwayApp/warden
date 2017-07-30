@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
+using Warden.Properties;
 
 namespace Warden.Core.Launchers
 {
@@ -21,7 +22,7 @@ namespace Warden.Core.Launchers
                 });
                 if (process == null)
                 {
-                    throw new WardenLaunchException("Process could not be launched for unknown reason");
+                    throw new WardenLaunchException(Resources.Exception_Process_Not_Launched_Unknown);
                 }
                 await WaitForProcessStart(process, TimeSpan.FromSeconds(10));
                 var warden = new WardenProcess(process.ProcessName, process.Id, path,
@@ -30,7 +31,7 @@ namespace Warden.Core.Launchers
             }
             catch (Exception ex)
             {
-                throw new WardenLaunchException("Process could not be launched: " + ex.Message);
+                throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Launched, ex.Message), ex);
             }
         }
 

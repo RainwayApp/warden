@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
+using Warden.Properties;
 
 namespace Warden.Core.Launchers
 {
@@ -23,7 +24,7 @@ namespace Warden.Core.Launchers
                 var process = new Process { StartInfo = startInfo };
                 if (!process.Start())
                 {
-                    throw new WardenLaunchException("Process could not start");
+                    throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
                 }
                 await Task.Delay(TimeSpan.FromMilliseconds(10));
                 var warden = new WardenProcess(Path.GetFileNameWithoutExtension(path),
@@ -32,7 +33,7 @@ namespace Warden.Core.Launchers
             }
             catch (Exception ex)
             {
-                throw new WardenLaunchException("Process could not be launched: " + ex.Message);
+                throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Launched, ex.Message), ex);
             }
         }
         public Task<WardenProcess> Launch(string path, string arguments)

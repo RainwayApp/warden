@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
+using Warden.Properties;
 
 namespace Warden.Windows
 {
@@ -39,9 +40,9 @@ namespace Warden.Windows
                     var pId = (int)processId;
                     return pId;
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    throw new WardenLaunchException($"Error while trying to launch your app: {e.Message}");
+                    throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App, ex.Message), ex);
                 }
             });
         }

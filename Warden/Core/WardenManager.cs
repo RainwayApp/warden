@@ -42,7 +42,7 @@ namespace Warden.Core
             }
             catch (Exception ex)
             {
-                throw new WardenException(ex.Message);
+                throw new WardenException(ex.Message, ex);
             }
         }
 
