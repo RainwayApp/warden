@@ -9,6 +9,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -21,41 +22,54 @@ namespace WardenExample
     {
         static void Main(string[] args)
         {
-            Start();
-
-            Console.Read();
+            Start().GetAwaiter().GetResult();
         }
 
-        private static async void Start()
+        private static async Task Start()
         {
             WardenManager.Initialize();
             Console.Write("Enter the process ID: ");
             var processId = int.Parse(Console.ReadLine());
             var test = WardenProcess.GetProcessFromId(processId);
-            Console.WriteLine($"Hooked into {test.Name}({test.Id})");
-
-            /*   var test = await WardenProcess.StartUri("steam://run/107410", "G:/Games/steamapps/common/Arma 3/arma3launcher.exe", string.Empty);
-                 await Task.Delay(TimeSpan.FromSeconds(60));
-                 string SerializedResponse = JsonConvert.SerializeObject(
-                     test,
-                     new Newtonsoft.Json.Converters.StringEnumConverter()
-                 );
-                 File.WriteAllText("test.json", SerializedResponse);*/
-            //var test = await WardenManager.Launch("Microsoft.Halo5Forge_8wekyb3d8bbwe", "!Ausar", ProcessTypes.Uwp);
-            //    var test = await WardenProcess.StartUri("steam://run/107410", "G:\\Games\\steamapps\\common\\Arma 3\\arma3launcher.exe", string.Empty);
-            /*var test = WardenProcess.GetProcessFromId(6716);
-            if (test != null)
+            test.OnProcessAdded += delegate(object sender, ProcessAddedEventArgs args)
             {
-                Console.WriteLine(test.Name);
-                test.OnStateChange += delegate (object sender, StateEventArgs args)
+                if (args.ParentId == test.Id)
                 {
-                    Console.WriteLine(args.State);
-                };
-                test.OnChildStateChange += delegate (object sender, StateEventArgs args)
+                    Console.WriteLine($"Added child {args.Name}({args.Id}) to root process {test.Name}({test.Id})");
+                }
+                else
                 {
-                    Console.WriteLine($"{args.Id} {args.State}");
+                    var parentInfo = test.FindChildById(args.ParentId);
+                    if (parentInfo != null)
+                    {
+                        Console.WriteLine($"Added child process {args.Name}({args.Id}) to child {parentInfo.Name}({parentInfo.Id})");
+                    }
+                }
+            };
+            test.OnStateChange += delegate(object sender, StateEventArgs args)
+            {
+                Console.WriteLine($"---\nName: {test.Name}\nId: {test.Id}\nstate changed to {args.State}\n---");
+            };
+            test.OnChildStateChange += delegate(object sender, StateEventArgs args)
+            {
+                var childInfo = test.FindChildById(args.Id);
+                if (childInfo != null)
+                {
+                    Console.WriteLine($"---\nName: {childInfo.Name}\nId: {childInfo.Id}\nParentId:{childInfo.ParentId}\nstated changed to {args.State}\n---");
+                }
+            };
+            Console.WriteLine($"Hooked into {test.Name}({test.Id})");
+            Console.Read();
+            Console.WriteLine("Start notepad");
+            var wardenTest = await WardenProcess.Start("notepad.exe", string.Empty, ProcessTypes.Win32);
+            if (wardenTest != null)
+            {
+                wardenTest.OnStateChange += delegate (object sender, StateEventArgs args)
+                {
+                    Console.WriteLine($"---\nName: {wardenTest.Name}\nId: {wardenTest.Id}\nstate changed to {args.State}\n---");
                 };
-            }*/
+            }
+            Console.ReadKey(true);
         }
     }
 }

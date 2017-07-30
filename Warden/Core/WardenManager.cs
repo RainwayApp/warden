@@ -71,10 +71,8 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStopped(object sender, EventArrivedEventArgs e)
         {
-            var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
             HandleStoppedProcess(processId);
-            // Console.WriteLine($"Stopped: {processName},{processId}");
         }
 
         /// <summary>
@@ -135,7 +133,6 @@ namespace Warden.Core
                 managed.Name = processName;
             }
             HandleNewProcess(processName, processId, processParent);
-            //   Console.WriteLine($"Started: {processName},{processId},{processParent}");
         }
 
         /// <summary>
@@ -152,7 +149,12 @@ namespace Warden.Core
                 {
                     if (managed.AddChild(CreateProcessFromId(processName, managed.Id, processId)))
                     {
-                        //  Console.WriteLine($"Added child {processName}({processId}) to root process {managed.Name}({managed.Id})");
+                        managed.InvokeProcessAdd(new ProcessAddedEventArgs
+                        {
+                           Name = processName,
+                           Id = processId,
+                           ParentId = managed.Id
+                        });
                         break;
                     }
                 }
@@ -163,7 +165,12 @@ namespace Warden.Core
                 }
                 if (child.AddChild(CreateProcessFromId(processName, child.Id, processId)))
                 {
-                    // Console.WriteLine($"Added child process {processName}({processId}) to child {child.Name}({child.Id})");
+                    managed.InvokeProcessAdd(new ProcessAddedEventArgs
+                    {
+                        Name = processName,
+                        Id = processId,
+                        ParentId = child.Id
+                    });
                     break;
                 }
             }

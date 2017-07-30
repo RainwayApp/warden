@@ -25,6 +25,27 @@ namespace Warden.Core
         public int Id { get; }
     }
 
+    public class ProcessAddedEventArgs : EventArgs
+    {
+        public ProcessAddedEventArgs(string name, int parentId, int processId)
+        {
+            Name = name;
+            ParentId = parentId;
+            Id = processId;
+        }
+
+        public ProcessAddedEventArgs()
+        {
+            
+        }
+
+        public string Name { get; set;  }
+
+        public int ParentId { get; set; }
+
+        public int Id { get; set; }
+    }
+
     /// <summary>
     /// Provides access to local processes and their children in real-time.
     /// </summary>
@@ -32,6 +53,7 @@ namespace Warden.Core
     {
         public delegate void ChildStateUpdateHandler(object sender, StateEventArgs e);
         public delegate void StateUpdateHandler(object sender, StateEventArgs e);
+        public delegate void ProcessAddedHandler(object sender, ProcessAddedEventArgs e);
 
         internal WardenProcess(string name, int id, string path, ProcessState state, string arguments, ProcessTypes uwp)
         {
@@ -42,8 +64,8 @@ namespace Warden.Core
             Arguments = arguments;
             Type = uwp;
             Children = new ObservableCollection<WardenProcess>();
-            long epochTicks = new DateTime(1970, 1, 1).Ticks;
-            long unixTime = ((DateTime.UtcNow.Ticks - epochTicks) / TimeSpan.TicksPerSecond);
+            var epochTicks = new DateTime(1970, 1, 1).Ticks;
+            var unixTime = ((DateTime.UtcNow.Ticks - epochTicks) / TimeSpan.TicksPerSecond);
             TimeStamp = unixTime;
         }
 
@@ -127,11 +149,21 @@ namespace Warden.Core
         /// This event is fired when the process state has changed.
         /// </summary>
         public event StateUpdateHandler OnStateChange;
+
         /// <summary>
         /// This event is fired when a child for the current process has a state change.
         /// </summary>
         public event ChildStateUpdateHandler OnChildStateChange;
 
+        /// <summary>
+        /// This event is fired when a process is added to the main process or its children
+        /// </summary>
+        public event ProcessAddedHandler OnProcessAdded;
+
+        public void InvokeProcessAdd(ProcessAddedEventArgs args)
+        {
+            OnProcessAdded?.Invoke(this, args);
+        }
 
         /// <summary>
         /// Crawls a process tree and updates the states.
