@@ -31,7 +31,7 @@ namespace Warden.Core.Launchers
             }
             catch (Exception ex)
             {
-                throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Launched, ex.Message));
+                throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Launched, ex.Message), ex);
             }
         }
 

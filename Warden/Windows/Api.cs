@@ -40,9 +40,9 @@ namespace Warden.Windows
                     var pId = (int)processId;
                     return pId;
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App, e.Message));
+                    throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App, ex.Message), ex);
                 }
             });
         }

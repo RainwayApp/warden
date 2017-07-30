@@ -123,6 +123,12 @@
   <data name="Exception_Error_Trying_To_Launch_App" xml:space="preserve">
     <value>Error while trying to launch your app: {0}</value>
   </data>
+  <data name="Exception_Invalid_Process_Type" xml:space="preserve">
+    <value>Invalid Process Type</value>
+  </data>
+  <data name="Exception_Not_Initialized" xml:space="preserve">
+    <value>Warden is not initialized.</value>
+  </data>
   <data name="Exception_Process_Not_Launched" xml:space="preserve">
     <value>Process could not be launched: {0}</value>
   </data>

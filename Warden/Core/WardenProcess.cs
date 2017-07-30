@@ -9,6 +9,7 @@ using Warden.Core.Exceptions;
 using Warden.Core.Launchers;
 using Warden.Core.Utils;
 using static Warden.Core.WardenManager;
+using Warden.Properties;
 
 namespace Warden.Core
 {
@@ -292,7 +293,7 @@ namespace Warden.Core
         {
             if (!Initialized)
             {
-                throw new WardenManageException("Warden is not initialized.");
+                throw new WardenManageException(Resources.Exception_Not_Initialized);
             }
             var process = await new UriLauncher().LaunchUri(uri, path, arguments);
             if (process == null)
@@ -316,7 +317,7 @@ namespace Warden.Core
         {
             if (!Initialized)
             {
-                throw new WardenManageException("Warden is not initialized.");
+                throw new WardenManageException(Resources.Exception_Not_Initialized);
             }
             WardenProcess process;
             switch (type)
@@ -328,7 +329,7 @@ namespace Warden.Core
                     process = await new Win32Launcher().Launch(path, arguments);
                     break;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(type), type, null);
+                    throw new ArgumentOutOfRangeException(nameof(type), type, Resources.Exception_Invalid_Process_Type);
             }
             if (process == null)
             {

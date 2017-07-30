@@ -79,6 +79,24 @@ namespace Warden.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Invalid Process Type.
+        /// </summary>
+        internal static string Exception_Invalid_Process_Type {
+            get {
+                return ResourceManager.GetString("Exception_Invalid_Process_Type", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Warden is not initialized..
+        /// </summary>
+        internal static string Exception_Not_Initialized {
+            get {
+                return ResourceManager.GetString("Exception_Not_Initialized", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Process could not be launched: {0}.
         /// </summary>
         internal static string Exception_Process_Not_Launched {
