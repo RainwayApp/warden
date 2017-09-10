@@ -54,9 +54,8 @@ namespace Warden.Core
         {
             try
             {
-                WardenProcess process;
                 var key = ManagedProcesses.FirstOrDefault(x => x.Value.Id == processId).Key;
-                ManagedProcesses.TryRemove(key, out process);
+                ManagedProcesses.TryRemove(key, out _);
             }
             catch
             {

@@ -321,7 +321,7 @@ namespace Warden.Core
         /// <param name="path">The full path of the executable that should spawn after the URI launch.</param>
         /// <param name="arguments">Any additional arguments.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments)
+        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments, bool asUser = false)
         {
             if (!Initialized)
             {
@@ -344,8 +344,9 @@ namespace Warden.Core
         /// <param name="path">The full path of the executable or UWP family package name</param>
         /// <param name="arguments">>Any additional arguments.</param>
         /// <param name="type">The type of application you wish to launch.</param>
+        /// <param name="asUser">Set to true if launching a program from a service.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> Start(string path, string arguments, ProcessTypes type)
+        public static async Task<WardenProcess> Start(string path, string arguments, ProcessTypes type, bool asUser = false)
         {
             if (!Initialized)
             {
@@ -358,7 +359,7 @@ namespace Warden.Core
                     process = await new UwpLauncher().Launch(path, arguments);
                     break;
                 case ProcessTypes.Win32:
-                    process = await new Win32Launcher().Launch(path, arguments);
+                    process = await new Win32Launcher().Launch(path, arguments, asUser);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type), type, Resources.Exception_Invalid_Process_Type);

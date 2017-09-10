@@ -6,11 +6,29 @@ using System.Text;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
 using Warden.Properties;
+using Warden.Windows;
 
 namespace Warden.Core.Launchers
 {
     internal class Win32Launcher : ILauncher
     {
+        public async Task<WardenProcess> Launch(string path, string arguments, bool asUser)
+        {
+            if (asUser)
+            {
+                var formattedPath = $"{path} {arguments}";
+                if (Api.StartProcessAndBypassUac(formattedPath, out var procInfo) && procInfo.dwProcessId > 0)
+                {
+                    return WardenProcess.GetProcessFromId((int)procInfo.dwProcessId);
+                }
+            }
+            else
+            {
+                return await Launch(path, arguments);
+            }
+            return null;
+        }
+
         public async Task<WardenProcess> Launch(string path, string arguments)
         {
             try
@@ -39,7 +57,6 @@ namespace Warden.Core.Launchers
         {
             throw new NotImplementedException();
         }
-
 
         internal static async Task<bool> WaitForProcessStart(Process process, TimeSpan processTimeout)
         {
