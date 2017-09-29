@@ -61,7 +61,7 @@ namespace WardenExample
             Console.WriteLine($"Hooked into {test.Name}({test.Id})");
             Console.Read();
             Console.WriteLine("Start notepad");
-            var wardenTest = await WardenProcess.Start("notepad.exe", string.Empty, ProcessTypes.Win32);
+            var wardenTest = await WardenProcess.Start("notepad.exe", string.Empty);
             if (wardenTest != null)
             {
                 wardenTest.OnStateChange += delegate (object sender, StateEventArgs args)

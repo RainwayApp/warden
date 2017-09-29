@@ -321,13 +321,38 @@ namespace Warden.Core
         /// <param name="path">The full path of the executable that should spawn after the URI launch.</param>
         /// <param name="arguments">Any additional arguments.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments, bool asUser = false)
+        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments)
         {
             if (!Initialized)
             {
                 throw new WardenManageException(Resources.Exception_Not_Initialized);
             }
-            var process = await new UriLauncher().LaunchUri(uri, path, arguments);
+            //lets add it to the dictionary ahead of time in case our program launches faster than we can return
+            var key = Guid.NewGuid();
+            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path), new Random().Next(100000, 199999), path, ProcessState.Alive, arguments, ProcessTypes.Uri);
+            ManagedProcesses[key] = warden;
+            if (await new UriLauncher().LaunchUri(uri, path, arguments) != null)
+            {
+                return ManagedProcesses[key];
+            }
+            ManagedProcesses.TryRemove(key, out var t);
+            return null;
+        }
+
+        /// <summary>
+        /// Starts a monitored UWP process using the applications family package name and token.
+        /// </summary>
+        /// <param name="appId">The UWP family package name</param>
+        /// <param name="appToken">The token needed to launch the app within the package</param>
+        /// <param name="arguments">Any additional arguments.</param>
+        /// <returns></returns>
+        public static async Task<WardenProcess> StartUwp(string appId, string appToken, string arguments)
+        {
+            if (!Initialized)
+            {
+                throw new WardenManageException(Resources.Exception_Not_Initialized);
+            }
+            var process = await new UwpLauncher().Launch(appId, appToken, arguments);
             if (process == null)
             {
                 return null;
@@ -338,32 +363,20 @@ namespace Warden.Core
         }
 
         /// <summary>
-        /// Starts a Warden process using the applications full path.
-        /// This method can handle both Win32 applications and UWP.
+        /// Starts a monitored process using the applications full path.
+        /// This method should only be used for win32 applications 
         /// </summary>
-        /// <param name="path">The full path of the executable or UWP family package name</param>
+        /// <param name="path">The full path of the executable</param>
         /// <param name="arguments">>Any additional arguments.</param>
-        /// <param name="type">The type of application you wish to launch.</param>
         /// <param name="asUser">Set to true if launching a program from a service.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> Start(string path, string arguments, ProcessTypes type, bool asUser = false)
+        public static async Task<WardenProcess> Start(string path, string arguments, bool asUser = false)
         {
             if (!Initialized)
             {
                 throw new WardenManageException(Resources.Exception_Not_Initialized);
             }
-            WardenProcess process;
-            switch (type)
-            {
-                case ProcessTypes.Uwp:
-                    process = await new UwpLauncher().Launch(path, arguments);
-                    break;
-                case ProcessTypes.Win32:
-                    process = await new Win32Launcher().Launch(path, arguments, asUser);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(type), type, Resources.Exception_Invalid_Process_Type);
-            }
+            var process = await new Win32Launcher().Launch(path, arguments, asUser);
             if (process == null)
             {
                 return null;

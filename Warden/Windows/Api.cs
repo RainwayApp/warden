@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Security.Principal;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
 using Warden.Properties;
@@ -230,14 +231,15 @@ namespace Warden.Windows
         /// </summary>
         /// <param name="packageFamilyName">The AUMID of the app to launch</param>
         /// <param name="pId"></param>
-        public static Task<int> LaunchUwpApp(string packageFamilyName) // No async because the method does not need await
+        /// <param name="arguments"></param>
+        public static Task<int> LaunchUwpApp(string packageFamilyName, string arguments) // No async because the method does not need await
         {
             return Task.Run(() =>
             {
                 var mgr = new ApplicationActivationManager();
                 try
                 {
-                    mgr.ActivateApplication(packageFamilyName, null, ActivateOptions.None, out var processId);
+                    mgr.ActivateApplication(packageFamilyName, arguments, ActivateOptions.None, out var processId);
                     var pId = (int)processId;
                     return pId;
                 }
@@ -246,6 +248,15 @@ namespace Warden.Windows
                     throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App, ex.Message), ex);
                 }
             });
+        }
+
+        public static bool IsAdmin()
+        {
+            using (var identity = WindowsIdentity.GetCurrent())
+            {
+               var principal = new WindowsPrincipal(identity);
+               return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
         }
 
         [DllImport("Kernel32")]

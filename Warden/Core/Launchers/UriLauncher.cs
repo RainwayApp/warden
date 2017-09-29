@@ -26,7 +26,7 @@ namespace Warden.Core.Launchers
                 {
                     throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
                 }
-                await Task.Delay(TimeSpan.FromMilliseconds(10));
+                await Task.Delay(TimeSpan.FromMilliseconds(1));
                 var warden = new WardenProcess(Path.GetFileNameWithoutExtension(path),
                     new Random().Next(100000, 199999), path, ProcessState.Alive, arguments, ProcessTypes.Uri);
                 return warden;

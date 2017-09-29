@@ -14,7 +14,7 @@ namespace Warden.Core.Launchers
     {
         public async Task<WardenProcess> Launch(string path, string arguments)
         {
-            var pId = await Api.LaunchUwpApp($"{path}{arguments}");
+            var pId = await Api.LaunchUwpApp(path, arguments);
             if (pId <= 0)
             {
                 throw new WardenLaunchException(string.Format(Resources.Exception_Could_Not_Find_Process_Id, path));
@@ -32,6 +32,11 @@ namespace Warden.Core.Launchers
                 state = ProcessState.Dead;
             }
             return new WardenProcess(pName, pId, path, state, arguments, ProcessTypes.Uwp);
+        }
+
+        public async Task<WardenProcess> Launch(string path, string token, string arguments)
+        {
+            return await Launch($"{path}{arguments}", arguments);
         }
 
         public Task<WardenProcess> LaunchUri(string uri, string path, string arguments)

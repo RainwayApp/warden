@@ -5,6 +5,7 @@ using System.Linq;
 using System.Management;
 using Warden.Core.Exceptions;
 using Warden.Core.Utils;
+using Warden.Windows;
 using static Warden.Core.WardenProcess;
 
 namespace Warden.Core
@@ -26,6 +27,10 @@ namespace Warden.Core
         /// <param name="killTressOnExit"></param>
         public static void Initialize(bool killTressOnExit = false)
         {
+            if (!Api.IsAdmin())
+            {
+                throw new WardenManageException("Unable to initialize due to a lack of administrator privileges.");
+            }
             _killTressOnExit = killTressOnExit;
             try
             {
@@ -124,7 +129,7 @@ namespace Warden.Core
             //needed for uri promises
             foreach (var managed in ManagedProcesses.Values)
             {
-                if (managed.Id <= 100000 || !managed.Name.Equals(Path.GetFileNameWithoutExtension(processName)))
+                if (managed.Id < 100000 || !managed.Name.Equals(Path.GetFileNameWithoutExtension(processName)))
                 {
                     continue;
                 }
