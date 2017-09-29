@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
 using Warden.Core.Launchers;
@@ -321,7 +322,7 @@ namespace Warden.Core
         /// <param name="path">The full path of the executable that should spawn after the URI launch.</param>
         /// <param name="arguments">Any additional arguments.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments)
+        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments, CancellationToken cancelToken)
         {
             if (!Initialized)
             {
@@ -331,7 +332,7 @@ namespace Warden.Core
             var key = Guid.NewGuid();
             var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path), new Random().Next(100000, 199999), path, ProcessState.Alive, arguments, ProcessTypes.Uri);
             ManagedProcesses[key] = warden;
-            if (await new UriLauncher().LaunchUri(uri, path, arguments) != null)
+            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken) != null)
             {
                 return ManagedProcesses[key];
             }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Management;
 using System.Text;
@@ -46,6 +47,18 @@ namespace Warden.Core.Utils
             split.RemoveAt(0);
             arguments = string.Join(" ", split);
             return arguments;
+        }
+        public static Process GetProcess(string path)
+        {
+            try
+            {
+                return Process.GetProcessesByName(Path.GetFileNameWithoutExtension(path)).FirstOrDefault();
+            }
+            catch
+            {
+
+                return null;
+            }
         }
 
         public static string GetProcessPath(int processId)
