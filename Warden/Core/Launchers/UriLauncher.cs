@@ -15,6 +15,7 @@ namespace Warden.Core.Launchers
     internal class UriLauncher : ILauncher
     {
         private CancellationToken _cancelToken;
+        private Action<bool> _callback;
 
         public async Task<WardenProcess> LaunchUri(string uri, string path, string arguments)
         {
@@ -57,15 +58,58 @@ namespace Warden.Core.Launchers
                 throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Launched, ex.Message), ex);
             }
         }
+
         public Task<WardenProcess> Launch(string path, string arguments)
         {
             throw new NotImplementedException();
         }
 
-        public async Task<WardenProcess> PrepareUri(string uri, string path, string arguments, CancellationToken cancelToken)
+        public async Task<WardenProcess> PrepareUri(string uri, string path, string arguments, CancellationToken cancelToken, Action<bool> callback = null)
         {
+            _callback = callback;
             _cancelToken = cancelToken;
-            return await LaunchUri(uri, path, arguments);
+            return _callback != null
+                ? LaunchUriAsync(uri, path, arguments)
+                : await LaunchUri(uri, path, arguments);
+        }
+
+        private WardenProcess LaunchUriAsync(string uri, string path, string arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = uri,
+                Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments
+            };
+            var process = new Process { StartInfo = startInfo };
+            if (!process.Start())
+            {
+                throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
+            }
+            SpawnChecker(path);
+            return new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive, arguments, ProcessTypes.Uri);
+        }
+
+        private void SpawnChecker(string path)
+        {
+            Task.Run(async () =>
+            {
+                var startTime = DateTime.UtcNow;
+                while (DateTime.UtcNow - startTime < TimeSpan.FromMinutes(1))
+                {
+                    if (_cancelToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    if (ProcessUtils.GetProcess(path) != null)
+                    {
+                        _callback(true);
+                        return;
+                    }
+                    //aggressive poll
+                    await Task.Delay(TimeSpan.FromMilliseconds(5), _cancelToken);
+                }
+                _callback(false);
+            }, _cancelToken);
         }
     }
 }

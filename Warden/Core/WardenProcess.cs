@@ -341,6 +341,33 @@ namespace Warden.Core
         }
 
         /// <summary>
+        /// Launches a system URI asynchronously and returns an empty Warden process set to Alive
+        /// This spawns an asynchronous loop that will execute a callback if the target process is found
+        /// However the function returns right away to ensure it does not block. 
+        /// </summary>
+        /// <param name="uri">The URI that will be launched</param>
+        /// <param name="path">The full path of the executable that should spawn after the URI launch.</param>
+        /// <param name="arguments">Any additional arguments.</param>
+        /// <returns></returns>
+        public static async Task<WardenProcess> StartUriAsync(string uri, string path, string arguments, Action<bool> callback, CancellationToken cancelToken)
+        {
+            if (!Initialized)
+            {
+                throw new WardenManageException(Resources.Exception_Not_Initialized);
+            }
+            //lets add it to the dictionary ahead of time in case our program launches faster than we can return
+            var key = Guid.NewGuid();
+            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path), new Random().Next(100000, 199999), path, ProcessState.Alive, arguments, ProcessTypes.Uri);
+            ManagedProcesses[key] = warden;
+            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken, callback) != null)
+            {
+                return ManagedProcesses[key];
+            }
+            ManagedProcesses.TryRemove(key, out var t);
+            return null;
+        }
+
+        /// <summary>
         /// Starts a monitored UWP process using the applications family package name and token.
         /// </summary>
         /// <param name="appId">The UWP family package name</param>
