@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
+using Warden.Core.Utils;
 using Warden.Windows;
 using Warden.Properties;
 
@@ -31,7 +32,7 @@ namespace Warden.Core.Launchers
             {
                 state = ProcessState.Dead;
             }
-            return new WardenProcess(pName, pId, path, state, arguments, ProcessTypes.Uwp);
+            return new WardenProcess(pName, pId, path, state, arguments?.SplitSpace(), ProcessTypes.Uwp, null);
         }
 
         public async Task<WardenProcess> Launch(string path, string token, string arguments)

@@ -51,7 +51,7 @@ namespace Warden.Core.Launchers
                 }, _cancelToken);
                 return !started
                     ? null
-                    : new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive, arguments, ProcessTypes.Uri);
+                    : new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive, arguments?.SplitSpace(), ProcessTypes.Uri, null);
             }
             catch (Exception ex)
             {
@@ -86,7 +86,7 @@ namespace Warden.Core.Launchers
                 throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
             }
             SpawnChecker(path);
-            return new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive, arguments, ProcessTypes.Uri);
+            return new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive, arguments?.SplitSpace(), ProcessTypes.Uri, null);
         }
 
         private void SpawnChecker(string path)

@@ -24,7 +24,7 @@ namespace Warden.Core.Utils
         }
 
 
-        public static string GetCommandLine(int id)
+        public static List<string> GetCommandLine(int id)
         {
             var commandLine = new StringBuilder();
             commandLine.Append(" ");
@@ -39,14 +39,14 @@ namespace Warden.Core.Utils
             var arguments = commandLine.ToString().Trim();
             if (string.IsNullOrWhiteSpace(arguments))
             {
-                return arguments;
+                return null;
             }
             const string strRegex = @"[ ](?=(?:[^""]*""[^""]*"")*[^""]*$)";
             var myRegex = new Regex(strRegex, RegexOptions.IgnoreCase);
             var split = myRegex.Split(arguments).ToList();
             split.RemoveAt(0);
             arguments = string.Join(" ", split);
-            return arguments;
+            return arguments.SplitSpace();
         }
         public static Process GetProcess(string path)
         {
@@ -59,6 +59,13 @@ namespace Warden.Core.Utils
 
                 return null;
             }
+        }
+
+        public static string NormalizePath(string path)
+        {
+            return Path.GetFullPath(new Uri(path).LocalPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .ToUpperInvariant();
         }
 
         public static string GetProcessPath(int processId)
@@ -81,7 +88,7 @@ namespace Warden.Core.Utils
             {
                 // ignored
             }
-            return methodResult;
+            return NormalizePath(methodResult);
         }
     }
 }

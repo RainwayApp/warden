@@ -22,6 +22,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,6 +32,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -47,8 +49,10 @@
     <Compile Include="Core\Launchers\UriLauncher.cs" />
     <Compile Include="Core\Launchers\UwpLauncher.cs" />
     <Compile Include="Core\Launchers\Win32Launcher.cs" />
+    <Compile Include="Core\Models\ProcessFilter.cs" />
     <Compile Include="Core\Utils\ProcessUtils.cs" />
     <Compile Include="Core\Utils\ShutdownUtils.cs" />
+    <Compile Include="Core\Utils\StringUtils.cs" />
     <Compile Include="Core\WardenManager.cs" />
     <Compile Include="Core\WardenProcess.cs" />
     <Compile Include="Core\WardenEnums.cs" />
@@ -60,9 +64,7 @@
     </Compile>
     <Compile Include="Windows\Api.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Core\Models\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <None Include=".editorconfig" />
   </ItemGroup>

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
@@ -75,6 +76,7 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStopped(object sender, EventArrivedEventArgs e)
         {
+            var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
             HandleStoppedProcess(processId);
         }
@@ -127,14 +129,38 @@ namespace Warden.Core
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
             var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
             //needed for uri promises
-            foreach (var managed in ManagedProcesses.Values)
+            foreach (var kvp in ManagedProcesses.ToArray())
             {
-                if (managed.Id < 100000 || !managed.Name.Equals(Path.GetFileNameWithoutExtension(processName)))
+
+                var process = kvp.Value;
+                if (process.Id < 999999)
                 {
                     continue;
                 }
-                managed.Id = processId;
-                managed.Name = processName;
+                var newProcesWithoutExt = Path.GetFileNameWithoutExtension(processName);
+                //Some games from Blizzard have sub executables, so while we look for "HeroesOfTheStorm" it might launch "HeroesOfTheStorm_x64"
+                //So we find the most common occurrences in the string now 
+                StringUtils.LongestCommonSubstring(process.Name, newProcesWithoutExt, out var subName);
+                if (string.IsNullOrWhiteSpace(subName))
+                {
+                    continue;
+                }
+
+
+                if (!process.Name.ToLower().RemoveWhitespace().Equals(subName, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    continue;
+                }
+               
+                lock (process)
+                {
+                    ManagedProcesses[kvp.Key].Id = processId;
+
+                    ManagedProcesses[kvp.Key].Name = newProcesWithoutExt;
+
+                    ManagedProcesses[kvp.Key].Path = ProcessUtils.GetProcessPath(processId);
+
+                };
             }
             HandleNewProcess(processName, processId, processParent);
         }
@@ -151,7 +177,8 @@ namespace Warden.Core
             {
                 if (managed.Id == processParent)
                 {
-                    if (managed.AddChild(CreateProcessFromId(processName, managed.Id, processId)))
+                    var childProcess = CreateProcessFromId(processName, managed.Id, processId, managed.Filters);
+                    if (!childProcess.IsFiltered() && managed.AddChild(childProcess))
                     {
                         managed.InvokeProcessAdd(new ProcessAddedEventArgs
                         {
@@ -167,7 +194,8 @@ namespace Warden.Core
                 {
                     continue;
                 }
-                if (child.AddChild(CreateProcessFromId(processName, child.Id, processId)))
+                var grandChild = CreateProcessFromId(processName, child.Id, processId, child.Filters);
+                if (!grandChild.IsFiltered() && child.AddChild(grandChild))
                 {
                     managed.InvokeProcessAdd(new ProcessAddedEventArgs
                     {

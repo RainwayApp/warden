@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
+using Warden.Core.Utils;
 using Warden.Properties;
 using Warden.Windows;
 
@@ -44,7 +45,7 @@ namespace Warden.Core.Launchers
                 }
                 await WaitForProcessStart(process, TimeSpan.FromSeconds(10));
                 var warden = new WardenProcess(process.ProcessName, process.Id, path,
-                    process.HasExited ? ProcessState.Dead : ProcessState.Alive, arguments, ProcessTypes.Win32);
+                    process.HasExited ? ProcessState.Dead : ProcessState.Alive, arguments?.SplitSpace(), ProcessTypes.Win32, null);
                 return warden;
             }
             catch (Exception ex)
