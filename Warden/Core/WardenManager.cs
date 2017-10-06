@@ -145,21 +145,17 @@ namespace Warden.Core
                 {
                     continue;
                 }
-
-
                 if (!process.Name.ToLower().RemoveWhitespace().Equals(subName, StringComparison.CurrentCultureIgnoreCase))
                 {
                     continue;
                 }
-               
                 lock (process)
                 {
                     ManagedProcesses[kvp.Key].Id = processId;
-
                     ManagedProcesses[kvp.Key].Name = newProcesWithoutExt;
-
                     ManagedProcesses[kvp.Key].Path = ProcessUtils.GetProcessPath(processId);
-
+                    ManagedProcesses[kvp.Key].Arguments = ProcessUtils.GetCommandLine(processId);
+                    ManagedProcesses[kvp.Key]?.FoundCallback?.Invoke(true);
                 };
             }
             HandleNewProcess(processName, processId, processParent);

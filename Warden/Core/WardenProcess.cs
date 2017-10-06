@@ -94,7 +94,9 @@ namespace Warden.Core
 
         public string Name { get; internal set; }
 
-        public List<string> Arguments { get; }
+        public Action<bool> FoundCallback { get; set; }
+
+        public List<string> Arguments { get; internal set; }
 
         internal void SetParent(int parentId)
         {
@@ -385,9 +387,14 @@ namespace Warden.Core
             }
             //lets add it to the dictionary ahead of time in case our program launches faster than we can return
             var key = Guid.NewGuid();
-            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path), new Random().Next(1000000, 2000000), path, ProcessState.Alive, arguments?.SplitSpace(), ProcessTypes.Uri, filters);
+            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path),
+                new Random().Next(1000000, 2000000), path, ProcessState.Alive, arguments?.SplitSpace(),
+                ProcessTypes.Uri, filters)
+            {
+                FoundCallback = callback
+            };
             ManagedProcesses[key] = warden;
-            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken, callback) != null)
+            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken, key) != null)
             {
                 return ManagedProcesses[key];
             }
