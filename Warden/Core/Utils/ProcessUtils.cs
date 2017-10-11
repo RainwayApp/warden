@@ -4,14 +4,18 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace Warden.Core.Utils
 {
     internal static class ProcessUtils
     {
+
+        [DllImport("Kernel32.dll")]
+        static extern uint QueryFullProcessImageName(IntPtr hProcess, uint flags, StringBuilder text, out uint size);
+
         public static bool IsWindowsApp(string path)
         {
             return path.Contains("WindowsApps");
@@ -23,7 +27,7 @@ namespace Warden.Core.Utils
             return (from ManagementObject mo in mos.Get() select Process.GetProcessById(Convert.ToInt32(mo["ProcessID"]))).ToList();
         }
 
-
+   
         public static List<string> GetCommandLine(int id)
         {
             var commandLine = new StringBuilder();
@@ -48,6 +52,7 @@ namespace Warden.Core.Utils
             arguments = string.Join(" ", split);
             return arguments.SplitSpace();
         }
+
         public static Process GetProcess(string path)
         {
             try
@@ -63,6 +68,10 @@ namespace Warden.Core.Utils
 
         public static string NormalizePath(string path)
         {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return path;
+            }
             return Path.GetFullPath(new Uri(path).LocalPath)
                 .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 .ToUpperInvariant();
@@ -70,25 +79,25 @@ namespace Warden.Core.Utils
 
         public static string GetProcessPath(int processId)
         {
-            var methodResult = string.Empty;
+            var pathToExe = string.Empty;
             try
             {
-                var query = "SELECT ExecutablePath FROM Win32_Process WHERE ProcessId = " + processId;
-
-                using (var mos = new ManagementObjectSearcher(query))
+              
+                var proc = Process.GetProcessById(processId);
+                uint nChars = 256;
+                var buff = new StringBuilder((int)nChars);
+                var success = QueryFullProcessImageName(proc.Handle, 0, buff, out nChars);
+                if (0 != success)
                 {
-                    using (var moc = mos.Get())
-                    {
-                        var executablePath = (from mo in moc.Cast<ManagementObject>() select mo["ExecutablePath"]).First().ToString();
-                        methodResult = executablePath;
-                    }
+                    pathToExe = buff.ToString();
+                    pathToExe = NormalizePath(buff.ToString());
                 }
             }
             catch
             {
                 // ignored
             }
-            return NormalizePath(methodResult);
+            return pathToExe;
         }
     }
 }

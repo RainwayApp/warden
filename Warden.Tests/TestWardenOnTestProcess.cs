@@ -14,7 +14,7 @@ namespace Warden.Tests
 
         public TestWardenOnTestProcess()
         {
-            WardenManager.Initialize(true);
+            WardenManager.Initialize(new WardenOptions());
             _currentProcess = WardenProcess.GetProcessFromId(Process.GetCurrentProcess().Id);
         }
 

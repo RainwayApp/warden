@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Management.Instrumentation;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
@@ -74,8 +77,15 @@ namespace Warden.Core
             var epochTicks = new DateTime(1970, 1, 1).Ticks;
             var unixTime = ((DateTime.UtcNow.Ticks - epochTicks) / TimeSpan.TicksPerSecond);
             TimeStamp = unixTime;
+            if (Options.ReadFileHeaders && File.Exists(Path))
+            {
+                Headers = new PeHeaderReader(Path);
+            }
         }
 
+        public PeHeaderReader Headers { get; set; }
+
+        [IgnoreDataMember]
         public readonly List<ProcessFilter> Filters;
 
         public long TimeStamp { get; set; }
@@ -94,6 +104,7 @@ namespace Warden.Core
 
         public string Name { get; internal set; }
 
+        [IgnoreDataMember]
         public Action<bool> FoundCallback { get; set; }
 
         public List<string> Arguments { get; internal set; }
@@ -285,51 +296,51 @@ namespace Warden.Core
         {
             try
             {
-                var process = Process.GetProcessById(Id);
-                if (!process.HasExited)
+                if (Options.UseLegacyKill)
                 {
-                    process.Kill();
-                    process.WaitForExit();
-                }
-            }
-            catch
-            {
-                //
-            }
-            if (Children != null)
-            {
-                KillChildren(Children);
-            }
-        }
-
-        /// <summary>
-        /// Loops over the tree killing all children
-        /// </summary>
-        /// <param name="children"></param>
-        private void KillChildren(ObservableCollection<WardenProcess> children)
-        {
-            foreach (var child in children)
-            {
-                try
-                {
-                    var process = Process.GetProcessById(child.Id);
+                    var process = Process.GetProcessById(Id);
                     if (!process.HasExited)
                     {
                         process.Kill();
                         process.WaitForExit();
                     }
                 }
-                catch
+                else
                 {
-                    //
+                    var image = TaskSwitch.ProcessId;
+                    image.Value = Id.ToString();
+                    var taskKill = new TaskKill
+                    {
+                        Arguments = new List<TaskSwitch>
+                        {
+                            TaskSwitch.Force,
+                            TaskSwitch.TerminateChildren,
+                            image
+                        }
+                    };
+                    taskKill.Execute(out var output, out var error);
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        Debug.WriteLine(output?.Trim());
+                    }
+                    if (!string.IsNullOrWhiteSpace(error))
+                    {
+                        Debug.WriteLine(error?.Trim());
+                    }
                 }
-                if (child.Children != null)
+            }
+            catch
+            {
+                //
+            }
+            if (Children != null && Options.DeepKill)
+            {
+                foreach (var child in Children)
                 {
-                    KillChildren(child.Children);
+                    child.Kill();
                 }
             }
         }
-
         #region static class
 
         /// <summary>
@@ -470,6 +481,7 @@ namespace Warden.Core
         {
             if (children == null)
             {
+
                 return null;
             }
             foreach (var child in children)

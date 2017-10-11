@@ -38,7 +38,9 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Design" />
     <Reference Include="System.Management" />
+    <Reference Include="System.Runtime.Serialization" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Core\Exceptions\WardenExceptionStrings.cs" />
@@ -50,9 +52,11 @@
     <Compile Include="Core\Launchers\UwpLauncher.cs" />
     <Compile Include="Core\Launchers\Win32Launcher.cs" />
     <Compile Include="Core\Models\ProcessFilter.cs" />
+    <Compile Include="Core\Utils\PeHeader.cs" />
     <Compile Include="Core\Utils\ProcessUtils.cs" />
     <Compile Include="Core\Utils\ShutdownUtils.cs" />
     <Compile Include="Core\Utils\StringUtils.cs" />
+    <Compile Include="Core\Utils\TaskKill.cs" />
     <Compile Include="Core\WardenManager.cs" />
     <Compile Include="Core\WardenProcess.cs" />
     <Compile Include="Core\WardenEnums.cs" />

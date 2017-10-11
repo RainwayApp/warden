@@ -19,7 +19,7 @@ namespace Warden.Properties {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "4.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Resources {
@@ -84,6 +84,24 @@ namespace Warden.Properties {
         internal static string Exception_Invalid_Process_Type {
             get {
                 return ResourceManager.GetString("Exception_Invalid_Process_Type", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unable to initialize due to a lack of administrator privileges..
+        /// </summary>
+        internal static string Exception_No_Admin {
+            get {
+                return ResourceManager.GetString("Exception_No_Admin", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to No WardenOptions were set..
+        /// </summary>
+        internal static string Exception_No_Options {
+            get {
+                return ResourceManager.GetString("Exception_No_Options", resourceCulture);
             }
         }
         

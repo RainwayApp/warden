@@ -27,10 +27,16 @@ namespace WardenExample
 
         private static async Task Start()
         {
-            WardenManager.Initialize();
+            WardenManager.Initialize(new WardenOptions
+            {
+                CleanOnExit = true,
+                DeepKill = true,
+                ReadFileHeaders = true
+            });
             Console.Write("Enter the process ID: ");
             var processId = int.Parse(Console.ReadLine());
             var test = WardenProcess.GetProcessFromId(processId);
+      
             test.OnProcessAdded += delegate(object sender, ProcessAddedEventArgs args)
             {
                 if (args.ParentId == test.Id)
@@ -60,6 +66,9 @@ namespace WardenExample
             };
             Console.WriteLine($"Hooked into {test.Name}({test.Id})");
             Console.Read();
+            Console.WriteLine(JsonConvert.SerializeObject(test, Formatting.Indented));
+            test.Kill();
+
             Console.WriteLine("Start notepad");
             var wardenTest = await WardenProcess.Start("notepad.exe", string.Empty, null);
             if (wardenTest != null)

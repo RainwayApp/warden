@@ -129,6 +129,12 @@
   <data name="Exception_Not_Initialized" xml:space="preserve">
     <value>Warden is not initialized.</value>
   </data>
+  <data name="Exception_No_Admin" xml:space="preserve">
+    <value>Unable to initialize due to a lack of administrator privileges.</value>
+  </data>
+  <data name="Exception_No_Options" xml:space="preserve">
+    <value>No WardenOptions were set.</value>
+  </data>
   <data name="Exception_Process_Not_Launched" xml:space="preserve">
     <value>Process could not be launched: {0}</value>
   </data>
