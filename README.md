@@ -26,7 +26,12 @@ Install-Package Warden.NET
 To initialize Warden inside your application, call the static initialization function. (Pass ```true``` if you'd like Warden to kill all monitored processes on exit.)
 
 ```csharp
-WardenManager.Initialize();
+  WardenManager.Initialize(new WardenOptions
+  {
+                CleanOnExit = true,
+                DeepKill = true,
+                ReadFileHeaders = true
+  });
 ```
 
 ### Launching a Process
@@ -36,13 +41,13 @@ Warden processes are launched asynchronously and return null if it fails to laun
 If you wish to launch a Win32 application just call the following code. 
 
 ```csharp
-var process = await WardenProcess.Start("G:/Games/steamapps/common/NieRAutomata/NieRAutomata.exe", string.empty, ProcessTypes.Win32);
+var process = await WardenProcess.Start("G:/Games/steamapps/common/NieRAutomata/NieRAutomata.exe", string.empty, null);
 ```
 
 Similarly, you can launch a UWP like so.
 
 ```csharp
- var process = await WardenProcess.Start("Microsoft.Halo5Forge_8wekyb3d8bbwe", "!Ausar", ProcessTypes.Uwp);
+ var process = await  WardenProcess.StartUwp("Microsoft.Halo5Forge_8wekyb3d8bbwe", "!Ausar", string.Empty, null);
 ```
 
 If you need to start a URI, that is also supported. 
@@ -51,8 +56,15 @@ Pass the URI you wish to run, as well as the full path to the executable that sh
 
 
 ```csharp
- var test = await WardenProcess.StartUri("steam://run/107410", "G:/Games/steamapps/common/Arma 3/arma3launcher.exe", string.Empty);
+ var test = await WardenProcess.StartUriAsync("steam://run/107410", "G:/Games/steamapps/common/Arma 3/arma3launcher.exe", string.Empty, null, callback, token);
 ```
+
+Or you can synchronously wait for a URI to start 
+
+```csharp
+ var test =  await WardenProcess.StartUri("steam://run/107410", "G:/Games/steamapps/common/Arma 3/arma3launcher.exe", string.Empty, null, token);
+```
+
 
 Finally, you can build a Warden process tree from an already running process like so
 
@@ -62,7 +74,7 @@ Finally, you can build a Warden process tree from an already running process lik
 
 ### Listening to Process States
 
-You can subscribe to the ```OnStateChange``` event to know when a process state has updated. Additionally you can subscribe to ```OnChildStateChange``` to know when its children have had a change in state.
+You can subscribe to ```OnProcessAdded``` to know when a process has been added to the tree, the ```OnStateChange``` event to know when a process state has updated. Additionally you can subscribe to ```OnChildStateChange``` to know when its children have had a change in state.
 
 
 ## Notes
