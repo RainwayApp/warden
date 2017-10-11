@@ -328,17 +328,17 @@ namespace Warden.Core
                         Debug.WriteLine(error?.Trim());
                     }
                 }
+                if (Children != null && Children.Count > 0 && Options.DeepKill)
+                {
+                    foreach (var child in Children)
+                    {
+                        child?.Kill();
+                    }
+                }
             }
             catch
             {
                 //
-            }
-            if (Children != null && Options.DeepKill)
-            {
-                foreach (var child in Children)
-                {
-                    child.Kill();
-                }
             }
         }
         #region static class
