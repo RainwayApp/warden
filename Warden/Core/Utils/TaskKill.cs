@@ -14,6 +14,17 @@ namespace Warden.Core.Utils
         }
 
         /// <summary>
+        /// Sets the value and returns the instance.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public TaskSwitch SetValue(string value)
+        {
+            Value = value;
+            return this;
+        }
+
+        /// <summary>
         /// The physical argument for taskkill 
         /// </summary>
         public string Switch { get; }
@@ -77,6 +88,10 @@ namespace Warden.Core.Utils
             var argumentBuilder = new StringBuilder();
             foreach (var argument in Arguments)
             {
+                if (argument == null)
+                {
+                    continue;
+                }
                 if (argument.RequiresValue && string.IsNullOrWhiteSpace(argument.Value))
                 {
                     error = $"ERROR: The argument {argument.Switch} was passed without a value.";

@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Management.Instrumentation;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,10 +41,9 @@ namespace Warden.Core
 
         public ProcessAddedEventArgs()
         {
-            
         }
 
-        public string Name { get; set;  }
+        public string Name { get; set; }
 
         public int ParentId { get; set; }
 
@@ -58,13 +55,14 @@ namespace Warden.Core
     /// </summary>
     public class WardenProcess
     {
-        
-
         public delegate void ChildStateUpdateHandler(object sender, StateEventArgs e);
+
         public delegate void StateUpdateHandler(object sender, StateEventArgs e);
+
         public delegate void ProcessAddedHandler(object sender, ProcessAddedEventArgs e);
 
-        internal WardenProcess(string name, int id, string path, ProcessState state, List<string> arguments, ProcessTypes type, List<ProcessFilter> filters)
+        internal WardenProcess(string name, int id, string path, ProcessState state, List<string> arguments,
+            ProcessTypes type, List<ProcessFilter> filters)
         {
             Filters = filters;
             Name = name;
@@ -85,8 +83,7 @@ namespace Warden.Core
 
         public PeHeaderReader Headers { get; set; }
 
-        [IgnoreDataMember]
-        public readonly List<ProcessFilter> Filters;
+        [IgnoreDataMember] public readonly List<ProcessFilter> Filters;
 
         public long TimeStamp { get; set; }
 
@@ -244,7 +241,11 @@ namespace Warden.Core
             {
                 return false;
             }
-            return Filters.Any(filter => !string.IsNullOrWhiteSpace(filter.Name) && filter.Name.Equals(Name, StringComparison.CurrentCultureIgnoreCase) || !string.IsNullOrWhiteSpace(filter.Path) && NormalizePath(filter.Path).Equals(Path, StringComparison.CurrentCultureIgnoreCase));
+            return Filters.Any(filter =>
+                !string.IsNullOrWhiteSpace(filter.Name) &&
+                filter.Name.Equals(Name, StringComparison.CurrentCultureIgnoreCase) ||
+                !string.IsNullOrWhiteSpace(filter.Path) && NormalizePath(filter.Path)
+                    .Equals(Path, StringComparison.CurrentCultureIgnoreCase));
         }
 
         /// <summary>
@@ -289,6 +290,49 @@ namespace Warden.Core
             return false;
         }
 
+        private void KillLegacy()
+        {
+            try
+            {
+                var process = Process.GetProcessById(Id);
+                if (process.HasExited)
+                {
+                    return;
+                }
+                //will likely be ignored by some apps
+                process.Kill();
+                //give it 5 seconds and move on
+                process.WaitForExit(TimeSpan.FromSeconds(5).Milliseconds);
+            }
+            catch
+            {
+                //
+            }
+        }
+
+
+        private void TaskKill()
+        {
+            var taskKill = new TaskKill
+            {
+                Arguments = new List<TaskSwitch>
+                {
+                    TaskSwitch.Force,
+                    TaskSwitch.ProcessId.SetValue(Id.ToString()),
+                    Options.DeepKill ? TaskSwitch.TerminateChildren : null
+                }
+            };
+            taskKill.Execute(out var output, out var error);
+            if (!string.IsNullOrWhiteSpace(output))
+            {
+                Debug.WriteLine(output?.Trim());
+            }
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                Debug.WriteLine(error?.Trim());
+            }
+        }
+
         /// <summary>
         /// Kills the process and its children
         /// </summary>
@@ -298,42 +342,19 @@ namespace Warden.Core
             {
                 if (Options.UseLegacyKill)
                 {
-                    var process = Process.GetProcessById(Id);
-                    if (!process.HasExited)
-                    {
-                        process.Kill();
-                        process.WaitForExit();
-                    }
+                    KillLegacy();
                 }
                 else
                 {
-                    var image = TaskSwitch.ProcessId;
-                    image.Value = Id.ToString();
-                    var taskKill = new TaskKill
-                    {
-                        Arguments = new List<TaskSwitch>
-                        {
-                            TaskSwitch.Force,
-                            TaskSwitch.TerminateChildren,
-                            image
-                        }
-                    };
-                    taskKill.Execute(out var output, out var error);
-                    if (!string.IsNullOrWhiteSpace(output))
-                    {
-                        Debug.WriteLine(output?.Trim());
-                    }
-                    if (!string.IsNullOrWhiteSpace(error))
-                    {
-                        Debug.WriteLine(error?.Trim());
-                    }
+                    TaskKill();
                 }
-                if (Children != null && Children.Count > 0 && Options.DeepKill)
+                if (Children == null || Children.Count <= 0 || !Options.DeepKill)
                 {
-                    foreach (var child in Children)
-                    {
-                        child?.Kill();
-                    }
+                    return;
+                }
+                foreach (var child in Children)
+                {
+                    child?.Kill();
                 }
             }
             catch
@@ -341,6 +362,7 @@ namespace Warden.Core
                 //
             }
         }
+
         #region static class
 
         /// <summary>
@@ -352,7 +374,8 @@ namespace Warden.Core
         /// <param name="arguments">Any additional arguments.</param>
         /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments, List<ProcessFilter> filters, CancellationToken cancelToken)
+        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments,
+            List<ProcessFilter> filters, CancellationToken cancelToken)
         {
             if (!Initialized)
             {
@@ -364,7 +387,9 @@ namespace Warden.Core
             }
             //lets add it to the dictionary ahead of time in case our program launches faster than we can return
             var key = Guid.NewGuid();
-            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path), new Random().Next(1000000, 2000000), path, ProcessState.Alive, arguments.SplitSpace(), ProcessTypes.Uri, filters);
+            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path),
+                new Random().Next(1000000, 2000000), path, ProcessState.Alive, arguments.SplitSpace(), ProcessTypes.Uri,
+                filters);
             ManagedProcesses[key] = warden;
             if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken) != null)
             {
@@ -386,7 +411,8 @@ namespace Warden.Core
         /// <param name="callback">A callback executed on if the process launched or not.</param>
         /// <param name="cancelToken"></param>
         /// <returns></returns>
-        public static async Task<WardenProcess> StartUriAsync(string uri, string path, string arguments, List<ProcessFilter> filters, Action<bool> callback, CancellationToken cancelToken)
+        public static async Task<WardenProcess> StartUriAsync(string uri, string path, string arguments,
+            List<ProcessFilter> filters, Action<bool> callback, CancellationToken cancelToken)
         {
             if (!Initialized)
             {
@@ -421,7 +447,8 @@ namespace Warden.Core
         /// <param name="arguments">Any additional arguments.</param>
         /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> StartUwp(string appId, string appToken, string arguments, List<ProcessFilter> filters)
+        public static async Task<WardenProcess> StartUwp(string appId, string appToken, string arguments,
+            List<ProcessFilter> filters)
         {
             if (!Initialized)
             {
@@ -450,7 +477,8 @@ namespace Warden.Core
         /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
         /// <param name="asUser">Set to true if launching a program from a service.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> Start(string path, string arguments, List<ProcessFilter> filters, bool asUser = false)
+        public static async Task<WardenProcess> Start(string path, string arguments, List<ProcessFilter> filters,
+            bool asUser = false)
         {
             if (!Initialized)
             {
@@ -481,7 +509,6 @@ namespace Warden.Core
         {
             if (children == null)
             {
-
                 return null;
             }
             foreach (var child in children)
@@ -554,7 +581,8 @@ namespace Warden.Core
         /// <param name="id"></param>
         /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
         /// <returns>A WardenProcess that will be added to a child list.</returns>
-        internal static WardenProcess CreateProcessFromId(string name, int parentId, int id, List<ProcessFilter> filters)
+        internal static WardenProcess CreateProcessFromId(string name, int parentId, int id,
+            List<ProcessFilter> filters)
         {
             var path = GetProcessPath(id);
             var arguments = GetCommandLine(id);
