@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -37,8 +38,11 @@ namespace Warden.Core.Launchers
                 var process = Process.Start(new ProcessStartInfo
                 {
                     FileName = path,
-                    Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments
+                    Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments,
+                    WorkingDirectory = new FileInfo(path).Directory.FullName,
+                    UseShellExecute = true
                 });
+               
                 if (process == null)
                 {
                     throw new WardenLaunchException(Resources.Exception_Process_Not_Launched_Unknown);

@@ -24,7 +24,7 @@ namespace Warden.Core.Launchers
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = uri,
-                    Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments
+                    Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments,
                 };
                 var process = new Process { StartInfo = startInfo };
                 if (!process.Start())
