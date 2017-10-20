@@ -37,7 +37,7 @@ namespace Warden.Core.Launchers
 
         public async Task<WardenProcess> Launch(string path, string token, string arguments)
         {
-            return await Launch($"{path}{arguments}", arguments);
+            return await Launch($"{path}{token}", arguments);
         }
 
         public Task<WardenProcess> LaunchUri(string uri, string path, string arguments)
