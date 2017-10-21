@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 
 namespace Warden.Core.Utils
@@ -85,7 +87,7 @@ namespace Warden.Core.Utils
         private void ExecuteTaskKill(out string output, out string error)
         {
 
-            var argumentBuilder = new StringBuilder();
+            var argumentBuilder = new List<string>();
             foreach (var argument in Arguments)
             {
                 if (argument == null)
@@ -98,7 +100,7 @@ namespace Warden.Core.Utils
                     output = null;
                     return;
                 }
-                argumentBuilder.Append($"{argument.Switch} {(argument.RequiresValue ? argument.Value : string.Empty)}");
+                argumentBuilder.Add($"{argument.Switch} {(argument.RequiresValue ? argument.Value : string.Empty)}");
             }
             using (var p = new Process())
             {
@@ -110,7 +112,7 @@ namespace Warden.Core.Utils
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
-                    Arguments = argumentBuilder.ToString()
+                    Arguments = string.Join(" ", argumentBuilder)
                 };
                 p.Start();
                 output = p.StandardOutput.ReadToEnd();
