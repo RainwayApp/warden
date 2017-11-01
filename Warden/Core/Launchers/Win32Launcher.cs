@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
 using Warden.Core.Utils;
@@ -14,6 +15,13 @@ namespace Warden.Core.Launchers
 {
     internal class Win32Launcher : ILauncher
     {
+        internal static Regex ProgramPath = new Regex(@"([A-Z]:\\[^/:\*\?<>\|]+\.((exe)))|(\\{2}[^/:\*\?<>\|]+\.((exe)))", RegexOptions.IgnoreCase);
+
+        internal static Regex Arguments =
+            new Regex(
+                @"(?:^[ \t]*((?>[^ \t""\r\n]+|""[^""]+(?:""|$))+)|(?!^)[ \t]+((?>[^ \t""\\\r\n]+|(?<!\\)(?:\\\\)*""[^""\\\r\n]*(?:\\.[^""\\\r\n]*)*""{1,2}|(?:\\(?:\\\\)*"")+|\\+(?!""))+)|([^ \t\r\n]))",
+                RegexOptions.IgnoreCase);
+
         public async Task<WardenProcess> Launch(string path, string arguments, bool asUser)
         {
             if (asUser)
@@ -35,11 +43,36 @@ namespace Warden.Core.Launchers
         {
             try
             {
+                var getSafeFileName = ProgramPath.Match(path);
+               
+                if (!getSafeFileName.Success)
+                {
+                    throw new WardenLaunchException(Resources.Exception_Process_Not_Launched_Unknown);
+                }
+
+                var filePath = getSafeFileName.Value;
+                if (string.IsNullOrWhiteSpace(arguments))
+                {
+                    //Lets check our original path for arguments
+                    var argumentCollection = Arguments.Matches(path);
+                    var safeArguments = new StringBuilder();
+                    foreach (Match arg in argumentCollection)
+                    {
+                        var argumentValue = arg.Value;
+                        if (argumentValue.Contains(filePath))
+                        {
+                            continue;
+                        }
+                        safeArguments.Append(arg.Value);
+                    }
+                    arguments = safeArguments.ToString();
+                }
+
                 var process = Process.Start(new ProcessStartInfo
                 {
-                    FileName = path,
-                    Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments,
-                    WorkingDirectory = new FileInfo(path).Directory.FullName,
+                    FileName = filePath,
+                    Arguments = arguments,
+                    WorkingDirectory = new FileInfo(filePath).Directory.FullName,
                     UseShellExecute = true
                 });
                
