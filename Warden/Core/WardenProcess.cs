@@ -366,6 +366,34 @@ namespace Warden.Core
         #region static class
 
         /// <summary>
+        /// Checks if a process is currently running, if so we build the WardenProcess right away or fetch a monitored one.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="process"></param>
+        /// <returns></returns>
+        private static bool CheckForWardenProcess(string path, out WardenProcess process)
+        {
+            var runningProcess = GetProcess(path);
+            if (runningProcess == null)
+            {
+                process = null;
+                return false;
+            }
+            //Lets check our watch list first
+            foreach (var managedProcess in ManagedProcesses)
+            {
+                if (managedProcess.Value.Id != runningProcess.Id)
+                {
+                    continue;
+                }
+                process = ManagedProcesses[managedProcess.Key];
+                return true;
+            }
+            process = GetProcessFromId(runningProcess.Id);
+            return process != null;
+        }
+
+        /// <summary>
         /// Launches a system URI and returns an empty Warden process set to Alive
         /// If the process is found later via its path the process ID will be updated to match so children can be added.
         /// </summary>
@@ -380,6 +408,10 @@ namespace Warden.Core
             if (!Initialized)
             {
                 throw new WardenManageException(Resources.Exception_Not_Initialized);
+            }
+            if (CheckForWardenProcess(path, out var existingProcess))
+            {
+                return existingProcess;
             }
             if (string.IsNullOrWhiteSpace(arguments))
             {
@@ -417,6 +449,10 @@ namespace Warden.Core
             if (!Initialized)
             {
                 throw new WardenManageException(Resources.Exception_Not_Initialized);
+            }
+            if (CheckForWardenProcess(path, out var existingProcess))
+            {
+                return existingProcess;
             }
             if (string.IsNullOrWhiteSpace(arguments))
             {
@@ -483,6 +519,10 @@ namespace Warden.Core
             if (!Initialized)
             {
                 throw new WardenManageException(Resources.Exception_Not_Initialized);
+            }
+            if (CheckForWardenProcess(path, out var existingProcess))
+            {
+                return existingProcess;
             }
             if (string.IsNullOrWhiteSpace(arguments))
             {
