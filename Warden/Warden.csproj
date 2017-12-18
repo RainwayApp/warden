@@ -57,6 +57,7 @@
     <Compile Include="Core\Utils\ShutdownUtils.cs" />
     <Compile Include="Core\Utils\StringUtils.cs" />
     <Compile Include="Core\Utils\TaskKill.cs" />
+    <Compile Include="Core\WardenImpersonator.cs" />
     <Compile Include="Core\WardenManager.cs" />
     <Compile Include="Core\WardenProcess.cs" />
     <Compile Include="Core\WardenEnums.cs" />
