@@ -67,7 +67,10 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <Compile Include="Windows\ActivateOptions.cs" />
     <Compile Include="Windows\Api.cs" />
+    <Compile Include="Windows\ApplicationActivationManager.cs" />
+    <Compile Include="Windows\IApplicationActivationManager.cs" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
