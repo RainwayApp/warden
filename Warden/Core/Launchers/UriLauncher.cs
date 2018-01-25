@@ -1,14 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
 using Warden.Core.Utils;
 using Warden.Properties;
+using Warden.Windows;
 
 namespace Warden.Core.Launchers
 {
@@ -17,7 +15,7 @@ namespace Warden.Core.Launchers
         private CancellationToken _cancelToken;
         private Guid _id;
 
-        public async Task<WardenProcess> LaunchUri(string uri, string path, string arguments)
+        public async Task<WardenProcess> LaunchUri(string uri, string path, string arguments, bool asUser)
         {
             try
             {
@@ -26,10 +24,23 @@ namespace Warden.Core.Launchers
                     FileName = uri,
                     Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments,
                 };
-                var process = new Process { StartInfo = startInfo };
-                if (!process.Start())
+                if (asUser)
                 {
-                    throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
+                    var formattedPath = $"{uri} {arguments}";
+                    if (!Api.StartProcessAndBypassUac(formattedPath, out var procInfo))
+                    {
+                        throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start,
+                            startInfo.FileName, startInfo.Arguments));
+                    }
+                }
+                else
+                {
+                    var process = new Process { StartInfo = startInfo };
+                    if (!process.Start())
+                    {
+                        throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
+                    }
+
                 }
                 var started = await Task.Run(async () =>
                 {
@@ -64,22 +75,38 @@ namespace Warden.Core.Launchers
             throw new NotImplementedException();
         }
 
-        public async Task<WardenProcess> PrepareUri(string uri, string path, string arguments, CancellationToken cancelToken, Guid id = new Guid())
+        public Task<WardenProcess> LaunchUri(string uri, string path, string arguments)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<WardenProcess> PrepareUri(string uri, string path, string arguments, CancellationToken cancelToken, Guid id, bool asUser = false)
         {
             _id = id;
             _cancelToken = cancelToken;
             return _id != Guid.Empty
-                ? LaunchUriAsync(uri, path, arguments)
-                : await LaunchUri(uri, path, arguments);
+                ? LaunchUriAsync(uri, path, arguments, asUser)
+                : await LaunchUri(uri, path, arguments, asUser);
         }
 
-        private WardenProcess LaunchUriAsync(string uri, string path, string arguments)
+        private WardenProcess LaunchUriAsync(string uri, string path, string arguments, bool asUser)
         {
             var startInfo = new ProcessStartInfo
             {
                 FileName = uri,
                 Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments
             };
+
+            if (asUser)
+            {
+                var formattedPath = $"{uri} {arguments}";
+                if (Api.StartProcessAndBypassUac(formattedPath, out var procInfo))
+                {
+                    return new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive,
+                        arguments?.SplitSpace(), ProcessTypes.Uri, null);
+                }
+                throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
+            }
             var process = new Process { StartInfo = startInfo };
             if (!process.Start())
             {

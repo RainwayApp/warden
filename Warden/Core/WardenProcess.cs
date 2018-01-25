@@ -403,7 +403,7 @@ namespace Warden.Core
         /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
         /// <returns></returns>
         public static async Task<WardenProcess> StartUri(string uri, string path, string arguments,
-            List<ProcessFilter> filters, CancellationToken cancelToken)
+            List<ProcessFilter> filters, CancellationToken cancelToken, bool asUser = false)
         {
             if (!Initialized)
             {
@@ -423,7 +423,7 @@ namespace Warden.Core
                 new Random().Next(1000000, 2000000), path, ProcessState.Alive, arguments.SplitSpace(), ProcessTypes.Uri,
                 filters);
             ManagedProcesses[key] = warden;
-            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken) != null)
+            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken,key, asUser) != null)
             {
                 return ManagedProcesses[key];
             }
@@ -444,7 +444,7 @@ namespace Warden.Core
         /// <param name="cancelToken"></param>
         /// <returns></returns>
         public static async Task<WardenProcess> StartUriAsync(string uri, string path, string arguments,
-            List<ProcessFilter> filters, Action<bool> callback, CancellationToken cancelToken)
+            List<ProcessFilter> filters, Action<bool> callback, CancellationToken cancelToken, bool asUser = false)
         {
             if (!Initialized)
             {
@@ -467,7 +467,7 @@ namespace Warden.Core
                 FoundCallback = callback
             };
             ManagedProcesses[key] = warden;
-            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken, key) != null)
+            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken, key, asUser) != null)
             {
                 return ManagedProcesses[key];
             }
