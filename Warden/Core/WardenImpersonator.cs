@@ -47,14 +47,13 @@ namespace Warden.Core
         private WindowsIdentity GetIdentity()
         {
             var hToken = IntPtr.Zero;
+            var explorer = Process.GetProcessesByName("explorer").FirstOrDefault();
 
-            var runningProcesses = Process.GetProcesses();
-            var currentSessionId = Process.GetCurrentProcess().SessionId;
-            var sameAsthisSession =
-                (from c in runningProcesses where c.SessionId == currentSessionId select c).ToArray();
-            var proc = sameAsthisSession[0];
-
-            if (OpenProcessToken(proc.Handle,
+            if (explorer == null)
+            {
+                return null;
+            }
+            if (OpenProcessToken(explorer.Handle,
                     TokenQuery | TokenImpersonate | TokenDuplicate,
                     ref hToken) != 0)
             {
