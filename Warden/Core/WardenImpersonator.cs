@@ -17,6 +17,7 @@ namespace Warden.Core
         private readonly WindowsImpersonationContext _context;
         private readonly WindowsIdentity _identity;
 
+        public IntPtr Token => _identity.Token;
 
         public WardenImpersonator()
         {

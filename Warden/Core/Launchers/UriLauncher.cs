@@ -7,6 +7,7 @@ using Warden.Core.Exceptions;
 using Warden.Core.Utils;
 using Warden.Properties;
 using Warden.Windows;
+using Microsoft.Win32;
 
 namespace Warden.Core.Launchers
 {
@@ -14,6 +15,29 @@ namespace Warden.Core.Launchers
     {
         private CancellationToken _cancelToken;
         private Guid _id;
+
+        public string UnwrapURI(string uri, params string[] args)
+        {
+            var scheme = new Uri(uri).Scheme;
+            RegistryKey HKCR = Registry.ClassesRoot;
+            RegistryKey schemeKey = HKCR.OpenSubKey(scheme);
+            if (schemeKey != null)
+            {
+                if ((schemeKey.GetValue(null) as string).StartsWith("URL:"))
+                {
+                    RegistryKey commandKey = schemeKey.OpenSubKey(@"Shell\Open\Command");
+                    string commandValue = commandKey.GetValue(null) as string;
+                    commandValue = commandValue.Replace("%1", uri);
+                    for(int i = 0; i < args.Length; ++i)
+                    {
+                        commandValue = commandValue.Replace($"%{i + 2}", args[i]);
+                    }
+                    return commandValue;
+                }
+            }
+
+            return string.Empty;
+        }
 
         public async Task<WardenProcess> LaunchUri(string uri, string path, string arguments, bool asUser)
         {
@@ -26,8 +50,7 @@ namespace Warden.Core.Launchers
                 };
                 if (asUser)
                 {
-                    var formattedPath = $"{uri} {arguments}";
-                    if (!Api.StartProcessAndBypassUac(formattedPath, out var procInfo))
+                    if (!Api.StartProcessAndBypassUac(UnwrapURI(uri, arguments), out var procInfo))
                     {
                         throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start,
                             startInfo.FileName, startInfo.Arguments));
@@ -99,15 +122,14 @@ namespace Warden.Core.Launchers
 
             if (asUser)
             {
-                var formattedPath = $"{uri} {arguments}";
-                if (Api.StartProcessAndBypassUac(formattedPath, out var procInfo))
+                if (Api.StartProcessAndBypassUac(UnwrapURI(uri, arguments), out var procInfo))
                 {
                     return new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive,
                         arguments?.SplitSpace(), ProcessTypes.Uri, null);
                 }
                 throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
             }
-            var process = new Process { StartInfo = startInfo };
+            var process = new Process { StartInfo = startInfo, };
             if (!process.Start())
             {
                 throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));

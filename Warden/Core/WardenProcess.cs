@@ -105,6 +105,7 @@ namespace Warden.Core
         public Action<bool> FoundCallback { get; set; }
 
         public List<string> Arguments { get; internal set; }
+        public static string WARDEN_REFER_PROC_UAC = "winlogon";
 
         internal void SetParent(int parentId)
         {
@@ -592,7 +593,15 @@ namespace Warden.Core
         {
             try
             {
-                var process = Process.GetProcessById(pId);
+                Process process = null;
+                try
+                {
+                    process = Process.GetProcessById(pId);
+                }
+                catch
+                {
+                    process = Process.GetProcesses().FirstOrDefault(it => it.Id == pId);
+                }
                 var processName = process.ProcessName;
                 var processId = process.Id;
                 var path = GetProcessPath(processId);

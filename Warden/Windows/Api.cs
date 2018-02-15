@@ -33,7 +33,7 @@ namespace Warden.Windows
             var dwSessionId = (int) WTSGetActiveConsoleSessionId();
 
             // obtain the process id of the winlogon process that is running within the currently active session
-            var processes = Process.GetProcessesByName("winlogon");
+            var processes = Process.GetProcessesByName(WardenProcess.WARDEN_REFER_PROC_UAC);
             foreach (var p in processes)
             {
                 if ((uint) p.SessionId == dwSessionId)
@@ -46,7 +46,7 @@ namespace Warden.Windows
             var hProcess = OpenProcess(MAXIMUM_ALLOWED, false, winlogonPid);
 
             // obtain a handle to the access token of the winlogon process
-            if (!OpenProcessToken(hProcess, TOKEN_DUPLICATE, ref hPToken))
+            if (!OpenProcessToken(hProcess, TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY, ref hPToken))
             {
                 CloseHandle(hProcess);
                 return false;
@@ -80,8 +80,18 @@ namespace Warden.Windows
             si.lpDesktop = @"winsta0\default";
             // interactive window station parameter; basically this indicates that the process created can display a GUI on the desktop
 
+            // Mutate environment varaibles
+            IntPtr env = IntPtr.Zero;
+            if (!CreateEnvironmentBlock(ref env, hUserTokenDup, false))
+            {
+                CloseHandle(hProcess);
+                CloseHandle(hPToken);
+                return false;
+
+            }
+
             // flags that specify the priority and creation method of the process
-            const int dwCreationFlags = NORMAL_PRIORITY_CLASS | CREATE_NEW_CONSOLE;
+            const int dwCreationFlags = NORMAL_PRIORITY_CLASS | CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT;
 
             // create a new process in the current user's logon session
             var result = CreateProcessAsUser(hUserTokenDup, // client's access token
@@ -91,12 +101,11 @@ namespace Warden.Windows
                 ref sa, // pointer to thread SECURITY_ATTRIBUTES
                 false, // handles are not inheritable
                 dwCreationFlags, // creation flags
-                IntPtr.Zero, // pointer to new environment block 
+                env, // pointer to new environment block 
                 null, // name of current directory 
                 ref si, // pointer to STARTUPINFO structure
                 out procInfo // receives information about new process
             );
-
             // invalidate the handles
             CloseHandle(hProcess);
             CloseHandle(hPToken);
@@ -105,7 +114,7 @@ namespace Warden.Windows
             return result; // return the result
         }
 
-        #region Structures
+#region Structures
 
         [StructLayout(LayoutKind.Sequential)]
         public struct SECURITY_ATTRIBUTES
@@ -147,9 +156,9 @@ namespace Warden.Windows
             public uint dwThreadId;
         }
 
-        #endregion
+#endregion
 
-        #region Enumerations
+#region Enumerations
 
         private enum TOKEN_TYPE
         {
@@ -170,23 +179,29 @@ namespace Warden.Windows
         #region Constants
 
         public const int TOKEN_DUPLICATE = 0x0002;
+        public const int TOKEN_IMPERSONATE = 0x0004;
+        public const int TOKEN_QUERY = 0x0008;
         public const uint MAXIMUM_ALLOWED = 0x2000000;
         public const int CREATE_NEW_CONSOLE = 0x00000010;
+        public const int CREATE_UNICODE_ENVIRONMENT = 0x00000400;
 
         public const int IDLE_PRIORITY_CLASS = 0x40;
         public const int NORMAL_PRIORITY_CLASS = 0x20;
         public const int HIGH_PRIORITY_CLASS = 0x80;
         public const int REALTIME_PRIORITY_CLASS = 0x100;
 
-        #endregion
+#endregion
 
-        #region Win32 API Imports
+#region Win32 API Imports
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr hSnapshot);
 
         [DllImport("kernel32.dll")]
         private static extern uint WTSGetActiveConsoleSessionId();
+
+        [DllImport("userenv.dll", SetLastError = true)]
+        private static extern bool CreateEnvironmentBlock(ref IntPtr lpEnvironment, IntPtr hToken, bool bInherit);
 
         [DllImport("advapi32.dll", EntryPoint = "CreateProcessAsUser", SetLastError = true, CharSet = CharSet.Ansi,
             CallingConvention = CallingConvention.StdCall)]
@@ -209,8 +224,8 @@ namespace Warden.Windows
         [DllImport("advapi32", SetLastError = true), SuppressUnmanagedCodeSecurity]
         private static extern bool OpenProcessToken(IntPtr ProcessHandle, int DesiredAccess, ref IntPtr TokenHandle);
 
-        #endregion
-        #endregion
+#endregion
+#endregion
 
 
         /// <summary>
