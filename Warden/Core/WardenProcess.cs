@@ -105,7 +105,14 @@ namespace Warden.Core
         public Action<bool> FoundCallback { get; set; }
 
         public List<string> Arguments { get; internal set; }
-        public static string WARDEN_REFER_PROC_UAC = "winlogon";
+
+        internal static string DefaultWardenReferProcUac = "winlogon";
+
+        /// <summary>
+        /// Used to set the target process which LaunchAsUser will steal a session token from. Default is "winlogon".
+        /// If your target process is gone, this will default back to winlogon.
+        /// </summary>
+        public static string WardenReferProcUac { get; set; } = DefaultWardenReferProcUac;
 
         internal void SetParent(int parentId)
         {

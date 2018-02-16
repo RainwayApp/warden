@@ -33,7 +33,12 @@ namespace Warden.Windows
             var dwSessionId = (int) WTSGetActiveConsoleSessionId();
 
             // obtain the process id of the winlogon process that is running within the currently active session
-            var processes = Process.GetProcessesByName(WardenProcess.WARDEN_REFER_PROC_UAC);
+            var processes = Process.GetProcessesByName(WardenProcess.WardenReferProcUac);
+            if (processes.Length == 0 && !WardenProcess.WardenReferProcUac.Equals(WardenProcess.DefaultWardenReferProcUac))
+            {
+                //the overwritten process was gone, so lets use winlogon to prevent a crash.
+                processes = Process.GetProcessesByName(WardenProcess.DefaultWardenReferProcUac);
+            }
             foreach (var p in processes)
             {
                 if ((uint) p.SessionId == dwSessionId)
@@ -41,7 +46,10 @@ namespace Warden.Windows
                     winlogonPid = (uint) p.Id;
                 }
             }
-
+            if (winlogonPid == 0)
+            {
+                return false;
+            }
             // obtain a handle to the winlogon process
             var hProcess = OpenProcess(MAXIMUM_ALLOWED, false, winlogonPid);
 
