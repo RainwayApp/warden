@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Warden</RootNamespace>
     <AssemblyName>Warden</AssemblyName>
-    <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -35,15 +35,15 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.Win32.Registry"/>
+    <Reference Include="Microsoft.Win32.Registry" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Design" />
     <Reference Include="System.Management" />
     <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.Security.AccessControl"/>
-    <Reference Include="System.Security.Principal.Windows"/>
+    <Reference Include="System.Security.AccessControl" />
+    <Reference Include="System.Security.Principal.Windows" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Core\Exceptions\WardenExceptionStrings.cs" />
