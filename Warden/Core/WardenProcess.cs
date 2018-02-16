@@ -521,7 +521,7 @@ namespace Warden.Core
         /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
         /// <param name="asUser">Set to true if launching a program from a service.</param>
         /// <returns></returns>
-        public static async Task<WardenProcess> Start(string path, string arguments, List<ProcessFilter> filters,
+        public static async Task<WardenProcess> Start(string path, string arguments, string workingDir = null, List<ProcessFilter> filters = null,
             bool asUser = false)
         {
             if (!Initialized)
@@ -536,7 +536,7 @@ namespace Warden.Core
             {
                 arguments = string.Empty;
             }
-            var process = await new Win32Launcher().Launch(path, arguments, asUser);
+            var process = await new Win32Launcher().Launch(path, arguments, workingDir, asUser);
             if (process == null)
             {
                 return null;

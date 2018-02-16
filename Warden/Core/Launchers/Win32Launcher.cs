@@ -20,8 +20,12 @@ namespace Warden.Core.Launchers
                 @"(?:^[ \t]*((?>[^ \t""\r\n]+|""[^""]+(?:""|$))+)|(?!^)[ \t]+((?>[^ \t""\\\r\n]+|(?<!\\)(?:\\\\)*""[^""\\\r\n]*(?:\\.[^""\\\r\n]*)*""{1,2}|(?:\\(?:\\\\)*"")+|\\+(?!""))+)|([^ \t\r\n]))",
                 RegexOptions.IgnoreCase);
 
-        public async Task<WardenProcess> Launch(string path, string arguments, bool asUser)
+        private string _workingDir;
+
+        public async Task<WardenProcess> Launch(string path, string arguments, string workingDir, bool asUser)
         {
+            _workingDir = workingDir;
+
             if (asUser)
             {
                 var formattedPath = $"{path} {arguments}";
@@ -66,11 +70,16 @@ namespace Warden.Core.Launchers
                     arguments = safeArguments.ToString();
                 }
 
+                if (string.IsNullOrWhiteSpace(_workingDir))
+                {
+                    _workingDir = new FileInfo(filePath).Directory.FullName;
+                }
+
                 var process = Process.Start(new ProcessStartInfo
                 {
                     FileName = filePath,
                     Arguments = arguments,
-                    WorkingDirectory = new FileInfo(filePath).Directory.FullName,
+                    WorkingDirectory = _workingDir,
                     UseShellExecute = true
                 });
                
