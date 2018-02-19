@@ -64,10 +64,14 @@ namespace Warden.Core
             {
 
                 ShutdownUtils.RegisterEvents();
+                ManagementScope m1 = new ManagementScope(@"\\.\root\cimv2");
+                m1.Connect();
+                ManagementScope m2 = new ManagementScope(@"\\.\root\cimv2");
+                m2.Connect();
                 _processStartEvent =
-                    new ManagementEventWatcher(new WqlEventQuery {EventClassName = "Win32_ProcessStartTrace"});
+                    new ManagementEventWatcher(m1, new WqlEventQuery {EventClassName = "Win32_ProcessStartTrace"});
                 _processStopEvent =
-                    new ManagementEventWatcher(new WqlEventQuery {EventClassName = "Win32_ProcessStopTrace"});
+                    new ManagementEventWatcher(m2, new WqlEventQuery {EventClassName = "Win32_ProcessStopTrace"});
                 _processStartEvent.EventArrived += ProcessStarted;
                 _processStopEvent.EventArrived += ProcessStopped;
                 _processStartEvent.Start();
