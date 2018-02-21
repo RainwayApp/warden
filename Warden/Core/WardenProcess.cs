@@ -282,6 +282,10 @@ namespace Warden.Core
             }
             foreach (var child in children)
             {
+                if (child == null)
+                {
+                    continue;
+                }
                 if (child.State == ProcessState.Alive)
                 {
                     return true;

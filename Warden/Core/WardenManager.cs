@@ -64,14 +64,18 @@ namespace Warden.Core
             {
 
                 ShutdownUtils.RegisterEvents();
-                var m1 = new ManagementScope(@"\\.\root\cimv2");
-                m1.Connect();
-                var m2 = new ManagementScope(@"\\.\root\cimv2");
-                m2.Connect();
+                var wmiOptions = new ConnectionOptions()
+                {
+                    Authentication = AuthenticationLevel.Default,
+                    EnablePrivileges = true,
+                    Impersonation = ImpersonationLevel.Impersonate
+                };
+                var scope = new ManagementScope(string.Format(@"\\{0}\root\cimv2", Environment.MachineName), wmiOptions);
+                scope.Connect();
                 _processStartEvent =
-                    new ManagementEventWatcher(m1, new WqlEventQuery {EventClassName = "Win32_ProcessStartTrace"});
+                    new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStartTrace" });
                 _processStopEvent =
-                    new ManagementEventWatcher(m2, new WqlEventQuery {EventClassName = "Win32_ProcessStopTrace"});
+                    new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStopTrace" });
                 _processStartEvent.EventArrived += ProcessStarted;
                 _processStopEvent.EventArrived += ProcessStopped;
                 _processStartEvent.Start();
@@ -86,7 +90,7 @@ namespace Warden.Core
 
         public static bool Initialized { get; private set; }
 
-        public static WardenOptions Options { get; private set ; }
+        public static WardenOptions Options { get; private set; }
 
         /// <summary>
         ///     Flushes a top level process.
@@ -205,7 +209,7 @@ namespace Warden.Core
             HandleNewProcess(processName, processId, processParent);
         }
 
-     
+
 
         /// <summary>
         ///     Attempts to add a new process as a child inside a tree if its parent is present.
