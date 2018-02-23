@@ -54,7 +54,7 @@ namespace Warden.Windows
             var hProcess = OpenProcess(MAXIMUM_ALLOWED, false, winlogonPid);
 
             // obtain a handle to the access token of the winlogon process
-            if (!OpenProcessToken(hProcess, TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY, ref hPToken))
+            if (!OpenProcessToken(hProcess, TOKEN_ALL_ACCESS, ref hPToken))
             {
                 CloseHandle(hProcess);
                 return false;
@@ -186,9 +186,20 @@ namespace Warden.Windows
 
         #region Constants
 
+        public const int STANDARD_RIGHTS_REQUIRED = 0x000F0000;
+
+        public const int TOKEN_ASSIGN_PRIMARY = 0x0001;
         public const int TOKEN_DUPLICATE = 0x0002;
         public const int TOKEN_IMPERSONATE = 0x0004;
         public const int TOKEN_QUERY = 0x0008;
+        public const int TOKEN_QUERY_SOURCE = 0x0010;
+        public const int TOKEN_ADJUST_PRIVILEGES = 0x0020;
+        public const int TOKEN_ADJUST_GROUPS = 0x0040;
+        public const int TOKEN_ADJUST_DEFAULT = 0x0080;
+        public const int TOKEN_ADJUST_SESSIONID = 0x0100;
+
+        public const int TOKEN_ALL_ACCESS = STANDARD_RIGHTS_REQUIRED | TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_QUERY_SOURCE | TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_GROUPS | TOKEN_ADJUST_DEFAULT;
+
         public const uint MAXIMUM_ALLOWED = 0x2000000;
         public const int CREATE_NEW_CONSOLE = 0x00000010;
         public const int CREATE_UNICODE_ENVIRONMENT = 0x00000400;
