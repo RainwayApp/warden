@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Runtime.Remoting.Lifetime;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
@@ -78,6 +79,22 @@ namespace Warden.Core
                     new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStopTrace" });
                 _processStartEvent.EventArrived += ProcessStarted;
                 _processStopEvent.EventArrived += ProcessStopped;
+                _processStartEvent.Options.Timeout = TimeSpan.FromDays(1);
+                _processStopEvent.Options.Timeout = TimeSpan.FromDays(1);
+                var startLease = _processStartEvent.InitializeLifetimeService() as ILease;
+                var stopLease = _processStopEvent.InitializeLifetimeService() as ILease;
+                if (startLease.CurrentState == LeaseState.Initial)
+                {
+                    startLease.InitialLeaseTime = TimeSpan.FromDays(1);
+                    startLease.SponsorshipTimeout = TimeSpan.FromDays(1);
+                    startLease.RenewOnCallTime = TimeSpan.FromDays(1);
+                }
+                if (stopLease.CurrentState == LeaseState.Initial)
+                {
+                    stopLease.InitialLeaseTime = TimeSpan.FromDays(1);
+                    stopLease.SponsorshipTimeout = TimeSpan.FromDays(1);
+                    stopLease.RenewOnCallTime = TimeSpan.FromDays(1);
+                }
                 _processStartEvent.Start();
                 _processStopEvent.Start();
                 Initialized = true;
@@ -86,6 +103,15 @@ namespace Warden.Core
             {
                 throw new WardenException(ex.Message, ex);
             }
+        }
+
+        public static void Renew()
+        {
+            var startLease = _processStartEvent.InitializeLifetimeService() as ILease;
+            var stopLease = _processStopEvent.InitializeLifetimeService() as ILease;
+            startLease.Renew(TimeSpan.FromDays(1));
+            stopLease.Renew(TimeSpan.FromDays(1));
+
         }
 
         public static bool Initialized { get; private set; }
@@ -116,6 +142,7 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStopped(object sender, EventArrivedEventArgs e)
         {
+            Renew();
             var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
             HandleStoppedProcess(processId);
@@ -202,6 +229,7 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStarted(object sender, EventArrivedEventArgs e)
         {
+            Renew();
             var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
             var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
