@@ -107,8 +107,8 @@ namespace Warden.Core
 
         public static void Renew()
         {
-            var startLease = _processStartEvent.InitializeLifetimeService() as ILease;
-            var stopLease = _processStopEvent.InitializeLifetimeService() as ILease;
+            var startLease = _processStartEvent.GetLifetimeService() as ILease;
+            var stopLease = _processStopEvent.GetLifetimeService() as ILease;
             startLease.Renew(TimeSpan.FromDays(1));
             stopLease.Renew(TimeSpan.FromDays(1));
 
