@@ -46,6 +46,7 @@
     <Reference Include="System.Security.Principal.Windows" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Core\DummyWardenLogger.cs" />
     <Compile Include="Core\Exceptions\WardenExceptionStrings.cs" />
     <Compile Include="Core\Exceptions\WardenException.cs" />
     <Compile Include="Core\Exceptions\WardenManageException.cs" />
@@ -61,6 +62,7 @@
     <Compile Include="Core\Utils\StringUtils.cs" />
     <Compile Include="Core\Utils\TaskKill.cs" />
     <Compile Include="Core\WardenImpersonator.cs" />
+    <Compile Include="Core\IWardenLogger.cs" />
     <Compile Include="Core\WardenManager.cs" />
     <Compile Include="Core\WardenProcess.cs" />
     <Compile Include="Core\WardenEnums.cs" />

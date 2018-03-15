@@ -44,6 +44,8 @@ namespace Warden.Core
         private static ManagementEventWatcher _processStartEvent;
         private static ManagementEventWatcher _processStopEvent;
 
+        public static IWardenLogger Logger = new DummyWardenLogger();
+
         public static ConcurrentDictionary<Guid, WardenProcess> ManagedProcesses = new ConcurrentDictionary<Guid, WardenProcess>();
 
 
@@ -81,6 +83,7 @@ namespace Warden.Core
                 _processStartEvent.Start();
                 _processStopEvent.Start();
                 Initialized = true;
+                Logger?.Debug("Initialized");
             }
             catch (Exception ex)
             {
@@ -102,6 +105,7 @@ namespace Warden.Core
             {
                 var key = ManagedProcesses.FirstOrDefault(x => x.Value.Id == processId).Key;
                 ManagedProcesses.TryRemove(key, out _);
+                Logger?.Debug($"Flushed PID {processId}");
             }
             catch
             {
@@ -118,6 +122,7 @@ namespace Warden.Core
         {
             var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
+            Logger?.Debug($"Detected {processName}:{processId} stopped");
             HandleStoppedProcess(processId);
         }
 
@@ -132,10 +137,15 @@ namespace Warden.Core
                 if (managed.Id == processId)
                 {
                     managed.UpdateState(ProcessState.Dead);
+                    Logger?.Debug($"Sent dead event to {managed.Id}");
                     return;
                 }
                 var child = FindChildById(processId, managed.Children);
                 child?.UpdateState(ProcessState.Dead);
+                if (child != null)
+                {
+                    Logger?.Debug($"Sent dead event to child {child?.Id}");
+                }
             });
         }
 
@@ -190,6 +200,7 @@ namespace Warden.Core
                     ManagedProcesses[kvp.Key].Path = ProcessUtils.GetProcessPath(processId);
                     ManagedProcesses[kvp.Key].Arguments = ProcessUtils.GetCommandLine(processId);
                     ManagedProcesses[kvp.Key]?.FoundCallback?.Invoke(true);
+                    Logger?.Info($"Updated managed process for {newProcesWithoutExt}:{processId}");
                 };
             });
         }
@@ -205,6 +216,7 @@ namespace Warden.Core
             var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
             var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
+            Logger?.Debug($"Detected {processName}:{processId} started");
             PreProcessing(processName, processId);
             HandleNewProcess(processName, processId, processParent);
         }
@@ -239,7 +251,6 @@ namespace Warden.Core
                 var child = FindChildById(processParent, managed.Children);
                 if (child == null)
                 {
-
                     return;
                 }
                 var grandChild = CreateProcessFromId(processName, child.Id, processId, child.Filters);
