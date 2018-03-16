@@ -456,7 +456,7 @@ namespace Warden.Core
         /// <param name="cancelToken"></param>
         /// <returns></returns>
         public static async Task<WardenProcess> StartUriAsync(string uri, string path, string arguments,
-            List<ProcessFilter> filters, Action<bool> callback, CancellationToken cancelToken, bool asUser = false)
+            List<ProcessFilter> filters, Action<bool> callback, CancellationToken cancelToken, bool asUser = false, string workingDir = null)
         {
             if (!Initialized)
             {
@@ -479,7 +479,7 @@ namespace Warden.Core
                 FoundCallback = callback
             };
             ManagedProcesses[key] = warden;
-            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken, key, asUser) != null)
+            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken, key, asUser, workingDir) != null)
             {
                 return ManagedProcesses[key];
             }

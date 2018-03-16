@@ -29,7 +29,7 @@ namespace Warden.Core.Launchers
             if (asUser)
             {
                 var formattedPath = $"{path} {arguments}";
-                if (Api.StartProcessAndBypassUac(formattedPath, out var procInfo) && procInfo.dwProcessId > 0)
+                if (Api.StartProcessAndBypassUac(formattedPath, out var procInfo, _workingDir) && procInfo.dwProcessId > 0)
                 {
                     return WardenProcess.GetProcessFromId((int)procInfo.dwProcessId);
                 }
@@ -79,7 +79,7 @@ namespace Warden.Core.Launchers
                 {
                     FileName = filePath,
                     Arguments = arguments,
-                    WorkingDirectory = _workingDir,
+                    WorkingDirectory = (string.IsNullOrWhiteSpace(_workingDir) || !Directory.Exists(_workingDir)) ? string.Empty : _workingDir,
                     UseShellExecute = true
                 });
                

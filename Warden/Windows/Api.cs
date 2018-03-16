@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
@@ -21,12 +22,16 @@ namespace Warden.Windows
         /// <param name="applicationName">The name of the application to launch</param>
         /// <param name="procInfo">Process information regarding the launched application that gets returned to the caller</param>
         /// <returns></returns>
-        public static bool StartProcessAndBypassUac(string applicationName, out PROCESS_INFORMATION procInfo)
+        public static bool StartProcessAndBypassUac(string applicationName, out PROCESS_INFORMATION procInfo, string workingDir)
         {
             uint winlogonPid = 0;
             IntPtr hUserTokenDup = IntPtr.Zero, hPToken = IntPtr.Zero;
             procInfo = new PROCESS_INFORMATION();
 
+            if (string.IsNullOrWhiteSpace(workingDir) || !Directory.Exists(workingDir))
+            {
+                workingDir = null;
+            }
 
             // obtain the currently active session id; every logged on user in the system has a unique session id
 
@@ -110,7 +115,7 @@ namespace Warden.Windows
                 false, // handles are not inheritable
                 dwCreationFlags, // creation flags
                 env, // pointer to new environment block 
-                null, // name of current directory 
+                workingDir, // name of current directory 
                 ref si, // pointer to STARTUPINFO structure
                 out procInfo // receives information about new process
             );

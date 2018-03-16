@@ -56,7 +56,7 @@ namespace Warden.Core.Launchers
             return string.Empty;
         }
 
-        public async Task<WardenProcess> LaunchUri(string uri, string path, string arguments, bool asUser)
+        public async Task<WardenProcess> LaunchUri(string uri, string path, string arguments, bool asUser, string workingDir)
         {
             try
             {
@@ -64,10 +64,11 @@ namespace Warden.Core.Launchers
                 {
                     FileName = uri,
                     Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments,
+                    WorkingDirectory = (string.IsNullOrWhiteSpace(workingDir) || !Directory.Exists(workingDir)) ? string.Empty : workingDir,
                 };
                 if (asUser)
                 {
-                    if (!Api.StartProcessAndBypassUac(UnwrapURI(uri, null, arguments), out var procInfo))
+                    if (!Api.StartProcessAndBypassUac(UnwrapURI(uri, null, arguments), out var procInfo, workingDir))
                     {
                         throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start,
                             startInfo.FileName, startInfo.Arguments));
@@ -120,33 +121,34 @@ namespace Warden.Core.Launchers
             throw new NotImplementedException();
         }
 
-        public async Task<WardenProcess> PrepareUri(string uri, string path, string arguments, CancellationToken cancelToken, Guid id, bool asUser = false)
+        public async Task<WardenProcess> PrepareUri(string uri, string path, string arguments, CancellationToken cancelToken, Guid id, bool asUser = false, string workingDir = null)
         {
             _id = id;
             _cancelToken = cancelToken;
             return _id != Guid.Empty
-                ? LaunchUriAsync(uri, path, arguments, asUser)
-                : await LaunchUri(uri, path, arguments, asUser);
+                ? LaunchUriAsync(uri, path, arguments, asUser, workingDir)
+                : await LaunchUri(uri, path, arguments, asUser, workingDir);
         }
 
-        private WardenProcess LaunchUriAsync(string uri, string path, string arguments, bool asUser)
+        private WardenProcess LaunchUriAsync(string uri, string path, string arguments, bool asUser, string workingDir)
         {
             var startInfo = new ProcessStartInfo
             {
                 FileName = uri,
-                Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments
+                Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments,
+                WorkingDirectory = (string.IsNullOrWhiteSpace(workingDir) || !Directory.Exists(workingDir)) ? string.Empty : workingDir,
             };
 
             if (asUser)
             {
-                if (Api.StartProcessAndBypassUac(UnwrapURI(uri, null, arguments), out var procInfo))
+                if (Api.StartProcessAndBypassUac(UnwrapURI(uri, null, arguments), out var procInfo, workingDir))
                 {
                     return new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive,
                         arguments?.SplitSpace(), ProcessTypes.Uri, null);
                 }
                 throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
             }
-            var process = new Process { StartInfo = startInfo, };
+            var process = new Process { StartInfo = startInfo };
             if (!process.Start())
             {
                 throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
