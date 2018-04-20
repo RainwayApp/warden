@@ -37,6 +37,11 @@ namespace Warden.Core
         /// If set to true, Warden will kill processes via Process.Kill instead of Tskill
         /// </summary>
         public bool UseLegacyKill { get; set; }
+
+        /// <summary>
+        /// If set to true, Warden will kill dllhost processes
+        /// </summary>
+        public bool KillDllHost { get; set; }
     }
 
     public static class WardenManager

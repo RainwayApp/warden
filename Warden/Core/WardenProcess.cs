@@ -352,13 +352,16 @@ namespace Warden.Core
         {
             try
             {
-                if (Options.UseLegacyKill)
+                if (Options.KillDllHost || !Name.Equals("dllhost", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    KillLegacy();
-                }
-                else
-                {
-                    TaskKill();
+                    if (Options.UseLegacyKill)
+                    {
+                        KillLegacy();
+                    }
+                    else
+                    {
+                        TaskKill();
+                    }
                 }
                 if (Children == null || Children.Count <= 0 || !Options.DeepKill)
                 {
