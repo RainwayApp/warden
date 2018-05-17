@@ -43,11 +43,22 @@ namespace Warden.Core
         {
         }
 
-        public string Name { get; set; }
+        public string Name { get; internal set; }
 
-        public int ParentId { get; set; }
+        public int ParentId { get; internal set; }
 
-        public int Id { get; set; }
+        public int Id { get; internal set; }
+    }
+
+
+    public class UntrackedProcessEventArgs : ProcessAddedEventArgs
+    {
+        public UntrackedProcessEventArgs(string name, int parentId, int processId) : base(name, parentId, processId) { }
+        public UntrackedProcessEventArgs() : base() { }
+
+        public bool Create { get; set; } = false;
+        public List<ProcessFilter> Filters { get; set; } = null;
+        public Action<WardenProcess> Callback { get; set; } = null;
     }
 
     /// <summary>

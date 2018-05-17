@@ -53,8 +53,8 @@ namespace Warden.Core
 
         public static ConcurrentDictionary<Guid, WardenProcess> ManagedProcesses = new ConcurrentDictionary<Guid, WardenProcess>();
 
-
-
+        public delegate void UntrackedProcessHandler(object sender, UntrackedProcessEventArgs e);
+        public static event UntrackedProcessHandler OnUntrackedProcessAdded;
 
         /// <summary>
         ///     Creates the Warden service which monitors processes on the computer.
@@ -110,7 +110,6 @@ namespace Warden.Core
             {
                 var key = ManagedProcesses.FirstOrDefault(x => x.Value.Id == processId).Key;
                 ManagedProcesses.TryRemove(key, out _);
-                Logger?.Debug($"Flushed PID {processId}");
             }
             catch
             {
@@ -127,7 +126,6 @@ namespace Warden.Core
         {
             var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
-            Logger?.Debug($"Detected {processName}:{processId} stopped");
             HandleStoppedProcess(processId);
         }
 
@@ -142,15 +140,10 @@ namespace Warden.Core
                 if (managed.Id == processId)
                 {
                     managed.UpdateState(ProcessState.Dead);
-                    Logger?.Debug($"Sent dead event to {managed.Id}");
                     return;
                 }
                 var child = FindChildById(processId, managed.Children);
                 child?.UpdateState(ProcessState.Dead);
-                if (child != null)
-                {
-                    Logger?.Debug($"Sent dead event to child {child?.Id}");
-                }
             });
         }
 
@@ -205,7 +198,6 @@ namespace Warden.Core
                     ManagedProcesses[kvp.Key].Path = ProcessUtils.GetProcessPath(processId);
                     ManagedProcesses[kvp.Key].Arguments = ProcessUtils.GetCommandLine(processId);
                     ManagedProcesses[kvp.Key]?.FoundCallback?.Invoke(true);
-                    Logger?.Info($"Updated managed process for {newProcesWithoutExt}:{processId}");
                 };
             });
         }
@@ -221,9 +213,33 @@ namespace Warden.Core
             var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
             var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
             var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
-            Logger?.Debug($"Detected {processName}:{processId} started");
             PreProcessing(processName, processId);
             HandleNewProcess(processName, processId, processParent);
+            HandleUnknownProcess(processName, processId, processParent);
+        }
+
+        /// <summary>
+        ///     Attempts to determine if a process is added but is dynamically tracked
+        /// </summary>
+        /// <param name="processName"></param>
+        /// <param name="processId"></param>
+        /// <param name="processParent"></param>
+        private static void HandleUnknownProcess(string processName, int processId, int processParent)
+        {
+            if(!ManagedProcesses.Values.AsParallel().Any(x => x.Id == processId))
+            {
+                var @event = new UntrackedProcessEventArgs(processName, processId, processParent);
+                foreach(UntrackedProcessHandler Invoke in OnUntrackedProcessAdded.GetInvocationList())
+                {
+                    @event.Filters = null;
+                    @event.Callback = null;
+                    Invoke(null, @event);
+                    if(@event.Create)
+                    {
+                        @event.Callback?.Invoke(GetProcessFromId(processId, @event.Filters));
+                    }
+                }
+            }
         }
 
 
