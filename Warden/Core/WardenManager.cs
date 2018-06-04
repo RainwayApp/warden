@@ -226,6 +226,10 @@ namespace Warden.Core
         /// <param name="processParent"></param>
         private static void HandleUnknownProcess(string processName, int processId, int processParent)
         {
+            if(OnUntrackedProcessAdded == null)
+            {
+                return;
+            }
             if(!ManagedProcesses.Values.AsParallel().Any(x => x.Id == processId || x.FindChildById(processId) != null))
             {
                 var @event = new UntrackedProcessEventArgs(processName, processId, processParent);
