@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
-using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
 using Warden.Core.Utils;
@@ -39,9 +38,9 @@ namespace Warden.Core
         public bool UseLegacyKill { get; set; }
 
         /// <summary>
-        /// If set to true, Warden will kill dllhost processes
+        /// Processes not to kill
         /// </summary>
-        public bool KillDllHost { get; set; }
+        public IEnumerable<string> KillWhitelist { get; set; }
     }
 
     public static class WardenManager

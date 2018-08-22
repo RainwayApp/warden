@@ -20,23 +20,30 @@ namespace Warden.Core.Launchers
         public string UnwrapURI(string uri, string SID, params string[] args)
         {
             var scheme = $@"SOFTWARE\Classes\{new Uri(uri).Scheme}";
-            RegistryKey HKLM = Registry.LocalMachine;
+            var HKLM = Registry.LocalMachine;
             if (SID != null)
             {
                 HKLM = Registry.Users;
                 scheme = $@"{SID}\{scheme}";
             }
-            RegistryKey schemeKey = HKLM.OpenSubKey(scheme);
+            var schemeKey = HKLM.OpenSubKey(scheme);
             if (schemeKey != null)
             {
                 if ((schemeKey.GetValue(null) as string).StartsWith("URL:"))
                 {
-                    RegistryKey commandKey = schemeKey.OpenSubKey(@"Shell\Open\Command");
-                    string commandValue = commandKey.GetValue(null) as string;
+                    var commandKey = schemeKey.OpenSubKey(@"Shell\Open\Command");
+                    var commandValue = commandKey.GetValue(null) as string;
                     commandValue = commandValue.Replace("%1", uri);
-                    for (int i = 0; i < args.Length; ++i)
+                    for (var i = 0; i < args.Length; ++i)
                     {
-                        commandValue = commandValue.Replace($"%{i + 2}", args[i]);
+                        if (commandValue.Contains($"%i{i + 2}"))
+                        {
+                            commandValue = commandValue.Replace($"%{i + 2}", args[i]);
+                        }
+                        else
+                        {
+                            commandValue += $" {args[i]}";
+                        }
                     }
                     return commandValue;
                 }
@@ -132,16 +139,19 @@ namespace Warden.Core.Launchers
 
         private WardenProcess LaunchUriAsync(string uri, string path, string arguments, bool asUser, string workingDir)
         {
+            var unwrappedURI = UnwrapURI(uri, null, arguments);
+            var unwrappedURISplit = unwrappedURI.SplitSpace();
             var startInfo = new ProcessStartInfo
             {
-                FileName = uri,
-                Arguments = string.IsNullOrWhiteSpace(arguments) ? string.Empty : arguments,
+                FileName = unwrappedURISplit[0],
+                Arguments = string.Join(" ", unwrappedURISplit.Skip(1)),
                 WorkingDirectory = (string.IsNullOrWhiteSpace(workingDir) || !Directory.Exists(workingDir)) ? string.Empty : workingDir,
+                UseShellExecute = false
             };
 
             if (asUser)
             {
-                if (Api.StartProcessAndBypassUac(UnwrapURI(uri, null, arguments), out var procInfo, workingDir))
+                if (Api.StartProcessAndBypassUac(unwrappedURI, out var procInfo, workingDir))
                 {
                     return new WardenProcess(Path.GetFileNameWithoutExtension(path), 0, path, ProcessState.Alive,
                         arguments?.SplitSpace(), ProcessTypes.Uri, null);

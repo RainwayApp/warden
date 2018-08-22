@@ -94,7 +94,7 @@ namespace Warden.Windows
             // interactive window station parameter; basically this indicates that the process created can display a GUI on the desktop
 
             // Mutate environment varaibles
-            IntPtr env = IntPtr.Zero;
+            var env = IntPtr.Zero;
             if (!CreateEnvironmentBlock(ref env, hUserTokenDup, false))
             {
                 CloseHandle(hProcess);

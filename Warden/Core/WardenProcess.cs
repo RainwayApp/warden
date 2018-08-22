@@ -363,7 +363,7 @@ namespace Warden.Core
         {
             try
             {
-                if (Options.KillDllHost || !Name.Equals("dllhost", StringComparison.InvariantCultureIgnoreCase))
+                if (!Options.KillWhitelist.Any(x => Name.StartsWith(x, StringComparison.InvariantCultureIgnoreCase)))
                 {
                     if (Options.UseLegacyKill)
                     {
