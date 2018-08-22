@@ -363,7 +363,7 @@ namespace Warden.Core
         {
             try
             {
-                if (!Options.KillWhitelist.Any(x => Name.StartsWith(x, StringComparison.InvariantCultureIgnoreCase)))
+                if (Options.KillWhitelist?.Any(x => Name.StartsWith(x, StringComparison.InvariantCultureIgnoreCase)) == false)
                 {
                     if (Options.UseLegacyKill)
                     {
