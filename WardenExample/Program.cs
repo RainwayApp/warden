@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Warden.Core;
+using Warden.Core.Models;
 using Warden.Core.Utils;
 
 namespace WardenExample

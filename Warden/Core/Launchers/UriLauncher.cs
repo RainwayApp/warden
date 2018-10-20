@@ -29,7 +29,7 @@ namespace Warden.Core.Launchers
             var schemeKey = HKLM.OpenSubKey(scheme);
             if (schemeKey != null)
             {
-                if ((schemeKey.GetValue(null) as string).StartsWith("URL:"))
+                if (schemeKey.GetValue("URL Protocol") != null)
                 {
                     var commandKey = schemeKey.OpenSubKey(@"Shell\Open\Command");
                     var commandValue = commandKey.GetValue(null) as string;
