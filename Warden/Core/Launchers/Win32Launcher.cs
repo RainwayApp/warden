@@ -13,7 +13,7 @@ namespace Warden.Core.Launchers
 {
     internal class Win32Launcher : ILauncher
     {
-        internal static Regex ProgramPath = new Regex(@"([A-Z]:\\[^/:\*\?<>\|]+\.((exe)))|(\\{2}[^/:\*\?<>\|]+\.((exe)))", RegexOptions.IgnoreCase);
+        internal static Regex ProgramPath = new Regex(@"^.([A-Z]:\\[^/:\*\?<>\|]+\.((exe)))|^.(\\{2}[^/:\*\?<>\|]+\.((exe)))|^.([A-Z0-9]*)", RegexOptions.IgnoreCase);
 
         internal static Regex Arguments =
             new Regex(
