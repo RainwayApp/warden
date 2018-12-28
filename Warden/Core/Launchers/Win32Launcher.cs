@@ -1,5 +1,4 @@
 ﻿using System;
-using System.ComponentModel.Design.Serialization;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -17,11 +16,6 @@ namespace Warden.Core.Launchers
 {
     internal class Win32Launcher : ILauncher
     {
-        internal static Regex Arguments =
-            new Regex(
-                @"(?:^[ \t]*((?>[^ \t""\r\n]+|""[^""]+(?:""|$))+)|(?!^)[ \t]+((?>[^ \t""\\\r\n]+|(?<!\\)(?:\\\\)*""[^""\\\r\n]*(?:\\.[^""\\\r\n]*)*""{1,2}|(?:\\(?:\\\\)*"")+|\\+(?!""))+)|([^ \t\r\n]))",
-                RegexOptions.IgnoreCase);
-
         private string _workingDir;
 
         internal static string GetSafePath(string path)
@@ -29,7 +23,7 @@ namespace Warden.Core.Launchers
             var regexForLocalAndNetworkPaths = new Regex(@"([A-Z]:\\[^/:\*\?<>\|]+\.((exe)))|(\\{2}[^/:\*\?<>\|]+\.((exe)))", RegexOptions.IgnoreCase);
             var regexForExecutables = new Regex(@"([A-Z0-9]*)\.((exe))", RegexOptions.IgnoreCase);
             var regexForCommands = new Regex(@"([A-Z0-9]*)", RegexOptions.IgnoreCase);
-            var regexForWardenCommands = new Regex("([\"'])(?:(?=(\\\\?))\\2.)*?\\1", RegexOptions.IgnoreCase); // It accepts wverything between quotation marks for now.
+            var regexForWardenCommands = new Regex("\"(.*?)\"", RegexOptions.IgnoreCase); //TODO: It accepts wverything between quotation marks for now.
 
             string result = null;
 
@@ -50,7 +44,11 @@ namespace Warden.Core.Launchers
             if (!string.IsNullOrWhiteSpace(arguments)) return arguments;
 
             //Lets check our original path for arguments
-            var argumentCollection = Arguments.Matches(path);
+            var regexForArguments = new Regex(
+                      @"(?:^[ \t]*((?>[^ \t""\r\n]+|""[^""]+(?:""|$))+)|(?!^)[ \t]+((?>[^ \t""\\\r\n]+|(?<!\\)(?:\\\\)*""[^""\\\r\n]*(?:\\.[^""\\\r\n]*)*""{1,2}|(?:\\(?:\\\\)*"")+|\\+(?!""))+)|([^ \t\r\n]))",
+                      RegexOptions.IgnoreCase);
+
+            var argumentCollection = regexForArguments.Matches(path);
             var safeArguments = new StringBuilder();
             foreach (Match arg in argumentCollection)
             {
