@@ -23,7 +23,7 @@ namespace Warden.Core.Launchers
             var regexForLocalAndNetworkPaths = new Regex(@"([A-Z]:\\[^/:\*\?<>\|]+\.((exe)))|(\\{2}[^/:\*\?<>\|]+\.((exe)))", RegexOptions.IgnoreCase);
             var regexForExecutables = new Regex(@"([A-Z0-9]*)\.((exe))", RegexOptions.IgnoreCase);
             var regexForCommands = new Regex(@"([A-Z0-9]*)", RegexOptions.IgnoreCase);
-            var regexForWardenCommands = new Regex("\"(.*?)\"", RegexOptions.IgnoreCase); //TODO: It accepts wverything between quotation marks for now.
+            var regexForWardenCommands = new Regex("\"(.*?)\"", RegexOptions.IgnoreCase); //TODO: It accepts everything between quotation marks for now.
 
             string result = null;
 
