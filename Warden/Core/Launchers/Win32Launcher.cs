@@ -1,6 +1,8 @@
 ﻿using System;
+using System.ComponentModel.Design.Serialization;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -9,18 +11,62 @@ using Warden.Core.Utils;
 using Warden.Properties;
 using Warden.Windows;
 
+
+[assembly: InternalsVisibleTo("Warden.Tests")]
 namespace Warden.Core.Launchers
 {
     internal class Win32Launcher : ILauncher
     {
-        internal static Regex ProgramPath = new Regex(@"^.([A-Z]:\\[^/:\*\?<>\|]+\.((exe)))|^.(\\{2}[^/:\*\?<>\|]+\.((exe)))|^.([A-Z0-9]*)", RegexOptions.IgnoreCase);
-
         internal static Regex Arguments =
             new Regex(
                 @"(?:^[ \t]*((?>[^ \t""\r\n]+|""[^""]+(?:""|$))+)|(?!^)[ \t]+((?>[^ \t""\\\r\n]+|(?<!\\)(?:\\\\)*""[^""\\\r\n]*(?:\\.[^""\\\r\n]*)*""{1,2}|(?:\\(?:\\\\)*"")+|\\+(?!""))+)|([^ \t\r\n]))",
                 RegexOptions.IgnoreCase);
 
         private string _workingDir;
+
+        internal static string GetSafePath(string path)
+        {
+            var regexForLocalAndNetworkPaths = new Regex(@"([A-Z]:\\[^/:\*\?<>\|]+\.((exe)))|(\\{2}[^/:\*\?<>\|]+\.((exe)))", RegexOptions.IgnoreCase);
+            var regexForExecutables = new Regex(@"([A-Z0-9]*)\.((exe))", RegexOptions.IgnoreCase);
+            var regexForCommands = new Regex(@"([A-Z0-9]*)", RegexOptions.IgnoreCase);
+            var regexForWardenCommands = new Regex("([\"'])(?:(?=(\\\\?))\\2.)*?\\1", RegexOptions.IgnoreCase); // It accepts wverything between quotation marks for now.
+
+            string result = null;
+
+            if (regexForWardenCommands.IsMatch(path))
+                result = regexForWardenCommands.Match(path).Value;
+            else if (regexForLocalAndNetworkPaths.IsMatch(path))
+                result = regexForLocalAndNetworkPaths.Match(path).Value;
+            else if (regexForExecutables.IsMatch(path))
+                result = regexForExecutables.Match(path).Value;
+            else if (regexForCommands.IsMatch(path))
+                result = regexForCommands.Match(path).Value;
+
+            return result;
+        }
+
+        internal static string GetSafeArgs(string path, string filePath, string arguments)
+        {
+            if (!string.IsNullOrWhiteSpace(arguments)) return arguments;
+
+            //Lets check our original path for arguments
+            var argumentCollection = Arguments.Matches(path);
+            var safeArguments = new StringBuilder();
+            foreach (Match arg in argumentCollection)
+            {
+                var argumentValue = arg.Value;
+                if (argumentValue.Contains(filePath))
+                {
+                    continue;
+                }
+
+                safeArguments.Append(arg.Value);
+            }
+
+            arguments = safeArguments.ToString();
+
+            return arguments;
+        }
 
         public async Task<WardenProcess> Launch(string path, string arguments, string workingDir, bool asUser)
         {
@@ -45,34 +91,19 @@ namespace Warden.Core.Launchers
         {
             try
             {
-                var getSafeFileName = ProgramPath.Match(path);
-               
-                if (!getSafeFileName.Success)
+                var safePath = GetSafePath(path);
+
+                if (safePath == null)
                 {
                     throw new WardenLaunchException(Resources.Exception_Process_Not_Launched_Unknown);
                 }
 
-                var filePath = getSafeFileName.Value;
-                if (string.IsNullOrWhiteSpace(arguments))
-                {
-                    //Lets check our original path for arguments
-                    var argumentCollection = Arguments.Matches(path);
-                    var safeArguments = new StringBuilder();
-                    foreach (Match arg in argumentCollection)
-                    {
-                        var argumentValue = arg.Value;
-                        if (argumentValue.Contains(filePath))
-                        {
-                            continue;
-                        }
-                        safeArguments.Append(arg.Value);
-                    }
-                    arguments = safeArguments.ToString();
-                }
+                var filePath = safePath;
+                arguments = GetSafeArgs(path, filePath, arguments);
 
                 if (string.IsNullOrWhiteSpace(_workingDir))
                 {
-                    _workingDir = new FileInfo(filePath).Directory.FullName;
+                    _workingDir = new FileInfo(filePath).Directory?.FullName;
                 }
 
                 var process = Process.Start(new ProcessStartInfo
@@ -82,7 +113,7 @@ namespace Warden.Core.Launchers
                     WorkingDirectory = (string.IsNullOrWhiteSpace(_workingDir) || !Directory.Exists(_workingDir)) ? string.Empty : _workingDir,
                     UseShellExecute = true
                 });
-               
+
                 if (process == null)
                 {
                     throw new WardenLaunchException(Resources.Exception_Process_Not_Launched_Unknown);
