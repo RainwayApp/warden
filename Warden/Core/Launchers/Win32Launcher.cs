@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -6,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
+using Warden.Core.Launchers.Rules;
 using Warden.Core.Utils;
 using Warden.Properties;
 using Warden.Windows;
@@ -16,25 +18,25 @@ namespace Warden.Core.Launchers
 {
     internal class Win32Launcher : ILauncher
     {
+        private static readonly List<IRules> PathAcceptanceRules = new List<IRules>
+        {
+            new AcceptCodeInQuotationMarks(),
+            new AcceptUcn(),
+            new AcceptExecutables(),
+            new AcceptCommands()
+        };
+
         private string _workingDir;
 
         internal static string GetSafePath(string path)
         {
-            var regexForLocalAndNetworkPaths = new Regex(@"([A-Z]:\\[^/:\*\?<>\|]+\.((exe)))|(\\{2}[^/:\*\?<>\|]+\.((exe)))", RegexOptions.IgnoreCase);
-            var regexForExecutables = new Regex(@"([A-Z0-9]*)\.((exe))", RegexOptions.IgnoreCase);
-            var regexForCommands = new Regex(@"([A-Z0-9]*)", RegexOptions.IgnoreCase);
-            var regexForWardenCommands = new Regex("\"(.*?)\"", RegexOptions.IgnoreCase); //TODO: It accepts everything between quotation marks for now.
-
             string result = null;
 
-            if (regexForWardenCommands.IsMatch(path))
-                result = regexForWardenCommands.Match(path).Value;
-            else if (regexForLocalAndNetworkPaths.IsMatch(path))
-                result = regexForLocalAndNetworkPaths.Match(path).Value;
-            else if (regexForExecutables.IsMatch(path))
-                result = regexForExecutables.Match(path).Value;
-            else if (regexForCommands.IsMatch(path))
-                result = regexForCommands.Match(path).Value;
+            foreach(var rule in PathAcceptanceRules)
+            {
+                result = rule.Execute(path);
+                if (result != null) break;
+            }
 
             return result;
         }
