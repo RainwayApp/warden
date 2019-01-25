@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
 using Warden.Core.Utils;
@@ -65,24 +67,28 @@ namespace Warden.Core
             {
                 throw new WardenManageException(Resources.Exception_No_Admin);
             }
+
+            Stop();
             Options = options ?? throw new WardenManageException(Resources.Exception_No_Options);
             try
             {
-
                 ShutdownUtils.RegisterEvents();
                 var wmiOptions = new ConnectionOptions
                 {
                     Authentication = AuthenticationLevel.Default,
                     EnablePrivileges = true,
-                    Impersonation = ImpersonationLevel.Impersonate
+                    Impersonation = ImpersonationLevel.Impersonate,
+                    Timeout = TimeSpan.MaxValue
                 };
                 var scope = new ManagementScope($@"\\{Environment.MachineName}\root\cimv2", wmiOptions);
                 scope.Connect();
                 _processStartEvent =
                     new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStartTrace" });
+                _processStartEvent.Options.Timeout = wmiOptions.Timeout;
+                _processStartEvent.EventArrived += ProcessStarted;
                 _processStopEvent =
                     new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStopTrace" });
-                _processStartEvent.EventArrived += ProcessStarted;
+                _processStopEvent.Options.Timeout = wmiOptions.Timeout;
                 _processStopEvent.EventArrived += ProcessStopped;
                 _processStartEvent.Start();
                 _processStopEvent.Start();
@@ -123,20 +129,37 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStopped(object sender, EventArrivedEventArgs e)
         {
-            var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
-            var processName = "Unknown";
-            try
+            try 
             {
-                processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+                var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
+                var processName = "Unknown";
+                try
+                {
+                    processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+                }
+                catch(Exception ex)
+                {
+                    Logger?.Error(ex.ToString());
+                }
+                #if DEBUG
+                Logger?.Debug($"{processName} ({processId}) stopped");
+                #endif
+                new Thread(() =>
+                           {
+                               try
+                               {
+                                   HandleStoppedProcess(processId);
+                               }
+                               catch(Exception ex)
+                               {
+                                   Logger?.Error(ex.ToString());
+                               }                                   
+                           }).Start();
             }
             catch(Exception ex)
             {
                 Logger?.Error(ex.ToString());
             }
-            #if DEBUG
-            Logger?.Debug($"{processName} ({processId}) stopped");
-            #endif
-            HandleStoppedProcess(processId);
         }
 
         /// <summary>
@@ -164,7 +187,7 @@ namespace Warden.Core
         {
             _processStartEvent?.Stop();
             _processStopEvent?.Stop();
-            if (Options.CleanOnExit)
+            if (Options?.CleanOnExit == true)
             {
                 Parallel.ForEach(ManagedProcesses.Values, managed =>
                 {
@@ -220,23 +243,48 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStarted(object sender, EventArrivedEventArgs e)
         {
-            var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
-            var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
-            var processName = "Unknown";
             try
             {
-                processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+                var processId = int.Parse(e.NewEvent.Properties["ProcessID"]
+                                           .Value.ToString());
+                var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"]
+                                               .Value.ToString());
+                var processName = "Unknown";
+                new Thread(() =>
+                           {
+                               try
+                               {
+                                   try
+                                   {
+                                       processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+                                       if (string.IsNullOrWhiteSpace(processName))
+                                           processName = Path.GetFileName(Process.GetProcessById(processId).MainModule.FileName);
+                                   }
+                                   catch (ArgumentException)
+                                   {
+                                       // ignored
+                                   }
+                                   catch (Exception ex)
+                                   {
+                                       Logger?.Error(ex.ToString());
+                                   }
+#if DEBUG
+                                   Logger?.Debug($"{processName} ({processId}) started by {processParent}");
+#endif
+                                   PreProcessing(processName, processId);
+                                   HandleNewProcess(processName, processId, processParent);
+                                   HandleUnknownProcess(processName, processId, processParent);
+                               }
+                               catch (Exception ex)
+                               {
+                                   Logger?.Error(ex.ToString());
+                               }
+                           }).Start();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger?.Error(ex.ToString());
             }
-            #if DEBUG
-            Logger?.Debug($"{processName} ({processId}) started by {processParent}");
-            #endif
-            PreProcessing(processName, processId);
-            HandleNewProcess(processName, processId, processParent);
-            HandleUnknownProcess(processName, processId, processParent);
         }
 
         /// <summary>
