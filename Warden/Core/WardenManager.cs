@@ -123,9 +123,16 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStopped(object sender, EventArrivedEventArgs e)
         {
-            var processId = int.Parse(e.NewEvent.Properties["ProcessID"]
-                                       .Value.ToString());
-            var processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+            var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
+            var processName = "Unknown";
+            try
+            {
+                processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+            }
+            catch(Exception ex)
+            {
+                Logger?.Error(ex.ToString());
+            }
             #if DEBUG
             Logger?.Debug($"{processName} ({processId}) stopped");
             #endif
@@ -213,11 +220,17 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStarted(object sender, EventArrivedEventArgs e)
         {
-            var processId = int.Parse(e.NewEvent.Properties["ProcessID"]
-                                       .Value.ToString());
-            var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"]
-                                           .Value.ToString());
-            var processName =  Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+            var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
+            var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
+            var processName = "Unknown";
+            try
+            {
+                processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+            }
+            catch(Exception ex)
+            {
+                Logger?.Error(ex.ToString());
+            }
             #if DEBUG
             Logger?.Debug($"{processName} ({processId}) started by {processParent}");
             #endif
