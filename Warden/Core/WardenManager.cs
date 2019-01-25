@@ -70,13 +70,13 @@ namespace Warden.Core
             {
 
                 ShutdownUtils.RegisterEvents();
-                var wmiOptions = new ConnectionOptions()
+                var wmiOptions = new ConnectionOptions
                 {
                     Authentication = AuthenticationLevel.Default,
                     EnablePrivileges = true,
                     Impersonation = ImpersonationLevel.Impersonate
                 };
-                var scope = new ManagementScope(string.Format(@"\\{0}\root\cimv2", Environment.MachineName), wmiOptions);
+                var scope = new ManagementScope($@"\\{Environment.MachineName}\root\cimv2", wmiOptions);
                 scope.Connect();
                 _processStartEvent =
                     new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStartTrace" });
@@ -123,8 +123,12 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStopped(object sender, EventArrivedEventArgs e)
         {
-            var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
-            var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
+            var processId = int.Parse(e.NewEvent.Properties["ProcessID"]
+                                       .Value.ToString());
+            var processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+            #if DEBUG
+            Logger?.Debug($"{processName} ({processId}) stopped");
+            #endif
             HandleStoppedProcess(processId);
         }
 
@@ -209,9 +213,14 @@ namespace Warden.Core
         /// <param name="e"></param>
         private static void ProcessStarted(object sender, EventArrivedEventArgs e)
         {
-            var processName = e.NewEvent.Properties["ProcessName"].Value.ToString();
-            var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
-            var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
+            var processId = int.Parse(e.NewEvent.Properties["ProcessID"]
+                                       .Value.ToString());
+            var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"]
+                                           .Value.ToString());
+            var processName =  Path.GetFileName(ProcessUtils.GetProcessPath(processId));
+            #if DEBUG
+            Logger?.Debug($"{processName} ({processId}) started by {processParent}");
+            #endif
             PreProcessing(processName, processId);
             HandleNewProcess(processName, processId, processParent);
             HandleUnknownProcess(processName, processId, processParent);
