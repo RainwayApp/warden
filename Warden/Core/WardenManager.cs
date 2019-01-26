@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
@@ -57,6 +58,7 @@ namespace Warden.Core
         public delegate void UntrackedProcessHandler(object sender, UntrackedProcessEventArgs e);
         public static event UntrackedProcessHandler OnUntrackedProcessAdded;
 
+
         /// <summary>
         ///     Creates the Warden service which monitors processes on the computer.
         /// </summary>
@@ -82,12 +84,10 @@ namespace Warden.Core
                 };
                 var scope = new ManagementScope($@"\\{Environment.MachineName}\root\cimv2", wmiOptions);
                 scope.Connect();
-                _processStartEvent =
-                    new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStartTrace" });
+                _processStartEvent = new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStartTrace" });
                 _processStartEvent.Options.Timeout = wmiOptions.Timeout;
                 _processStartEvent.EventArrived += ProcessStarted;
-                _processStopEvent =
-                    new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStopTrace" });
+                _processStopEvent = new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStopTrace" });
                 _processStopEvent.Options.Timeout = wmiOptions.Timeout;
                 _processStopEvent.EventArrived += ProcessStopped;
                 _processStartEvent.Start();
@@ -132,17 +132,9 @@ namespace Warden.Core
             try 
             {
                 var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
-                var processName = "Unknown";
-                try
-                {
-                    processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
-                }
-                catch(Exception ex)
-                {
-                    Logger?.Error(ex.ToString());
-                }
+                e.NewEvent.Dispose();
                 #if DEBUG
-                Logger?.Debug($"{processName} ({processId}) stopped");
+                Logger?.Debug($"{processId} stopped");
                 #endif
                 new Thread(() =>
                            {
@@ -234,6 +226,7 @@ namespace Warden.Core
                 };
             });
         }
+
         /// <summary>
         ///     Detects when a new process launches on the PC, because of URI promises we will also try and update a root managed
         ///     process if
@@ -245,42 +238,42 @@ namespace Warden.Core
         {
             try
             {
-                var processId = int.Parse(e.NewEvent.Properties["ProcessID"]
-                                           .Value.ToString());
-                var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"]
-                                               .Value.ToString());
-                var processName = "Unknown";
-                new Thread(() =>
-                           {
-                               try
-                               {
-                                   try
-                                   {
-                                       processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId));
-                                       if (string.IsNullOrWhiteSpace(processName))
-                                           processName = Path.GetFileName(Process.GetProcessById(processId).MainModule.FileName);
-                                   }
-                                   catch (ArgumentException)
-                                   {
-                                       // ignored
-                                   }
-                                   catch (Exception ex)
-                                   {
-                                       Logger?.Error(ex.ToString());
-                                   }
+                var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
+                var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
+                string processName;
+                try
+                {
+                    processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId))?.Trim();
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(processName))
+                            processName = Path.GetFileName(Process.GetProcessById(processId).MainModule.FileName).Trim();
+                    }
+                    catch (ArgumentException)
+                    {
+                        processName = null;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(processName))
+                        processName = e.NewEvent.Properties["ProcessName"].Value.ToString().Trim();
+                    if (string.IsNullOrWhiteSpace(processName))
+                        processName = "Unknown";
+                }
+                catch (Exception ex)
+                {
+                    Logger?.Error(ex.ToString());
+                    processName = "Unknown";
+                }
+
+                e.NewEvent.Dispose();
 #if DEBUG
-                                   Logger?.Debug($"{processName} ({processId}) started by {processParent}");
+                Logger?.Debug($"{processName} ({processId}) started by {processParent}");
 #endif
-                                   PreProcessing(processName, processId);
-                                   HandleNewProcess(processName, processId, processParent);
-                                   HandleUnknownProcess(processName, processId, processParent);
-                               }
-                               catch (Exception ex)
-                               {
-                                   Logger?.Error(ex.ToString());
-                               }
-                           }).Start();
+                PreProcessing(processName, processId);
+                HandleNewProcess(processName, processId, processParent);
+                HandleUnknownProcess(processName, processId, processParent);
             }
+
             catch (Exception ex)
             {
                 Logger?.Error(ex.ToString());
