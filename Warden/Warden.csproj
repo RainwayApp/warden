@@ -63,6 +63,7 @@
     <Compile Include="Core\Utils\TaskKill.cs" />
     <Compile Include="Core\WardenImpersonator.cs" />
     <Compile Include="Core\IWardenLogger.cs" />
+    <Compile Include="Core\WardenLogger.cs" />
     <Compile Include="Core\WardenManager.cs" />
     <Compile Include="Core\WardenProcess.cs" />
     <Compile Include="Core\WardenEnums.cs" />

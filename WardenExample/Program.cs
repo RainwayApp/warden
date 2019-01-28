@@ -1,21 +1,7 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Reflection;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 using Warden.Core;
-using Warden.Core.Models;
-using Warden.Core.Utils;
 
 namespace WardenExample
 {
@@ -28,12 +14,15 @@ namespace WardenExample
 
         private static async Task Start()
         {
+            WardenManager.Logger = new WardenLogger();
             WardenManager.Initialize(new WardenOptions
             {
                 CleanOnExit = true,
                 DeepKill = true,
                 ReadFileHeaders = true
             });
+            Console.WriteLine("Press any key to continue");
+            Console.ReadKey(true);
             Console.Write("Enter the process ID: ");
             var processId = int.Parse(Console.ReadLine());
             var test = WardenProcess.GetProcessFromId(processId);

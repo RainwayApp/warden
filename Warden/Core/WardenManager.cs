@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Management;
@@ -17,6 +18,8 @@ using static Warden.Core.WardenProcess;
 namespace Warden.Core
 {
 
+    [SuppressMessage("ReSharper", "AutoPropertyCanBeMadeGetOnly.Global")]
+    [SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
     public class WardenOptions
     {
         /// <summary>
@@ -43,7 +46,12 @@ namespace Warden.Core
         /// <summary>
         /// Processes not to kill
         /// </summary>
-        public IEnumerable<string> KillWhitelist { get; set; }
+        public IEnumerable<string> KillWhitelist { get; set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// WMI Polling Interval
+        /// </summary>
+        public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(1);
     }
 
     public static class WardenManager
@@ -84,11 +92,9 @@ namespace Warden.Core
                 };
                 var scope = new ManagementScope($@"\\{Environment.MachineName}\root\cimv2", wmiOptions);
                 scope.Connect();
-                _processStartEvent = new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStartTrace" });
-                _processStartEvent.Options.Timeout = wmiOptions.Timeout;
+                _processStartEvent = new ManagementEventWatcher(scope, new WqlEventQuery("__InstanceCreationEvent", options.PollingInterval, "TargetInstance isa \"Win32_Process\""));
                 _processStartEvent.EventArrived += ProcessStarted;
-                _processStopEvent = new ManagementEventWatcher(scope, new WqlEventQuery { EventClassName = "Win32_ProcessStopTrace" });
-                _processStopEvent.Options.Timeout = wmiOptions.Timeout;
+                _processStopEvent = new ManagementEventWatcher(scope, new WqlEventQuery("__InstanceDeletionEvent", options.PollingInterval, "TargetInstance isa \"Win32_Process\""));
                 _processStopEvent.EventArrived += ProcessStopped;
                 _processStartEvent.Start();
                 _processStopEvent.Start();
@@ -131,7 +137,9 @@ namespace Warden.Core
         {
             try 
             {
-                var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
+                var targetInstance = (ManagementBaseObject) e.NewEvent["TargetInstance"];
+                var processId      = int.Parse(targetInstance["ProcessId"].ToString());
+                targetInstance.Dispose();
                 e.NewEvent.Dispose();
                 #if DEBUG
                 Logger?.Debug($"{processId} stopped");
@@ -238,33 +246,26 @@ namespace Warden.Core
         {
             try
             {
-                var processId = int.Parse(e.NewEvent.Properties["ProcessID"].Value.ToString());
-                var processParent = int.Parse(e.NewEvent.Properties["ParentProcessID"].Value.ToString());
-                string processName;
-                try
+                var targetInstance = (ManagementBaseObject) e.NewEvent["TargetInstance"];
+                var processId = int.Parse(targetInstance["ProcessId"].ToString());
+                var processParent = int.Parse(targetInstance["ParentProcessId"].ToString());
+                var processName = targetInstance["Name"].ToString().Trim();
+                if(processName == "?")
                 {
-                    processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId))?.Trim();
                     try
                     {
+                        processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId))?.Trim();
                         if (string.IsNullOrWhiteSpace(processName))
-                            processName = Path.GetFileName(Process.GetProcessById(processId).MainModule.FileName).Trim();
+                            processName = "Unknown";
                     }
-                    catch (ArgumentException)
+                    catch (Exception ex)
                     {
-                        processName = null;
-                    }
-
-                    if (string.IsNullOrWhiteSpace(processName))
-                        processName = e.NewEvent.Properties["ProcessName"].Value.ToString().Trim();
-                    if (string.IsNullOrWhiteSpace(processName))
+                        Logger?.Error(ex.ToString());
                         processName = "Unknown";
-                }
-                catch (Exception ex)
-                {
-                    Logger?.Error(ex.ToString());
-                    processName = "Unknown";
+                    }
                 }
 
+                targetInstance.Dispose();
                 e.NewEvent.Dispose();
 #if DEBUG
                 Logger?.Debug($"{processName} ({processId}) started by {processParent}");
