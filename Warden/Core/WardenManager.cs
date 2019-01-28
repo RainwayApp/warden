@@ -99,7 +99,7 @@ namespace Warden.Core
                 _processStartEvent.Start();
                 _processStopEvent.Start();
                 Initialized = true;
-                Logger?.Debug("Initialized");
+                Logger?.Info("Initialized");
             }
             catch (Exception ex)
             {
@@ -141,9 +141,7 @@ namespace Warden.Core
                 var processId      = int.Parse(targetInstance["ProcessId"].ToString());
                 targetInstance.Dispose();
                 e.NewEvent.Dispose();
-                #if DEBUG
                 Logger?.Debug($"{processId} stopped");
-                #endif
                 new Thread(() =>
                            {
                                try
@@ -185,8 +183,11 @@ namespace Warden.Core
         /// </summary>
         public static void Stop()
         {
+            Logger?.Info("Stopping Warden");
             _processStartEvent?.Stop();
+            _processStartEvent?.Dispose();
             _processStopEvent?.Stop();
+            _processStopEvent?.Dispose();
             if (Options?.CleanOnExit == true)
             {
                 Parallel.ForEach(ManagedProcesses.Values, managed =>
@@ -264,12 +265,9 @@ namespace Warden.Core
                         processName = "Unknown";
                     }
                 }
-
                 targetInstance.Dispose();
                 e.NewEvent.Dispose();
-#if DEBUG
                 Logger?.Debug($"{processName} ({processId}) started by {processParent}");
-#endif
                 PreProcessing(processName, processId);
                 HandleNewProcess(processName, processId, processParent);
                 HandleUnknownProcess(processName, processId, processParent);
