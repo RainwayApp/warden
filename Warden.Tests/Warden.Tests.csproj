@@ -59,6 +59,7 @@
   <ItemGroup>
     <Compile Include="TestWardenOnTestProcess.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="W32LauncherTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

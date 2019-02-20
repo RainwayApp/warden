@@ -53,7 +53,12 @@
     <Compile Include="Core\Exceptions\WardenException.cs" />
     <Compile Include="Core\Exceptions\WardenManageException.cs" />
     <Compile Include="Core\Exceptions\WardenLaunchException.cs" />
+    <Compile Include="Core\Launchers\Rules\AcceptCodeInQuotationMarks.cs" />
+    <Compile Include="Core\Launchers\Rules\AcceptCommands.cs" />
+    <Compile Include="Core\Launchers\Rules\AcceptExecutables.cs" />
+    <Compile Include="Core\Launchers\Rules\AcceptUcn.cs" />
     <Compile Include="Core\Launchers\ILauncher.cs" />
+    <Compile Include="Core\Launchers\Rules\IRules.cs" />
     <Compile Include="Core\Launchers\UriLauncher.cs" />
     <Compile Include="Core\Launchers\UwpLauncher.cs" />
     <Compile Include="Core\Launchers\Win32Launcher.cs" />
