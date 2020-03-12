@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Warden</RootNamespace>
     <AssemblyName>Warden</AssemblyName>
-    <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -56,7 +56,6 @@
     <Compile Include="Core\Launchers\UwpLauncher.cs" />
     <Compile Include="Core\Launchers\Win32Launcher.cs" />
     <Compile Include="Core\Models\ProcessFilter.cs" />
-    <Compile Include="Core\Utils\PeHeader.cs" />
     <Compile Include="Core\Utils\ProcessUtils.cs" />
     <Compile Include="Core\Utils\ShutdownUtils.cs" />
     <Compile Include="Core\Utils\StringUtils.cs" />
