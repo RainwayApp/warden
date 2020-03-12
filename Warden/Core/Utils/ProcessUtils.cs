@@ -47,16 +47,8 @@ namespace Warden.Core.Utils
             return processes;
         }
 
-        public static List<string> GetCommandLineFromString(string processData)
+        public static List<string> GetCommandLineFromString(string arguments)
         {
-            if (string.IsNullOrWhiteSpace(processData))
-            {
-                return null;
-            }
-            var commandLine = new StringBuilder();
-            commandLine.Append(" ");
-            commandLine.Append(processData);
-            var arguments = commandLine.ToString().Trim();
             if (string.IsNullOrWhiteSpace(arguments))
             {
                 return null;
@@ -85,16 +77,7 @@ namespace Warden.Core.Utils
                 }
             }
             var arguments = commandLine.ToString().Trim();
-            if (string.IsNullOrWhiteSpace(arguments))
-            {
-                return null;
-            }
-            const string strRegex = @"[ ](?=(?:[^""]*""[^""]*"")*[^""]*$)";
-            var myRegex = new Regex(strRegex, RegexOptions.IgnoreCase);
-            var split = myRegex.Split(arguments).ToList();
-            split.RemoveAt(0);
-            arguments = string.Join(" ", split);
-            return arguments.SplitSpace();
+            return string.IsNullOrWhiteSpace(arguments) ? null : GetCommandLineFromString(arguments);
         }
 
         public static Process GetProcess(string path)

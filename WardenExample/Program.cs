@@ -20,8 +20,7 @@ namespace WardenExample
             {
                 CleanOnExit = true,
                 DeepKill = true,
-                PollingInterval = TimeSpan.FromSeconds(1),
-                ReadFileHeaders = true
+                PollingInterval = TimeSpan.FromSeconds(1)
             });
          
             Console.WriteLine("Press any key to continue");
@@ -80,7 +79,7 @@ namespace WardenExample
 
         private static void WardenManagerOnOnUntrackedProcessAdded(object sender, UntrackedProcessEventArgs e)
         {
-            Console.WriteLine($"{e.ProcessPath} / {e.Id} / {e.Name}");
+            Console.WriteLine($"{e.ProcessPath} / {e.Id} / {e.Name} / {string.Join(" ", e.CommandLine?.ToArray() ?? new string[0])}");
         }
     }
 }
