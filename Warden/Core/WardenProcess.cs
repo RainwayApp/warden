@@ -172,7 +172,7 @@ namespace Warden.Core
 
         private void OnChildOnStateChange(object sender, StateEventArgs stateEventArgs)
         {
-            OnChildStateChange?.Invoke(this, stateEventArgs);
+            OnChildStateChange?.BeginInvoke(this, stateEventArgs, null, null);
         }
 
         /// <summary>
@@ -182,10 +182,10 @@ namespace Warden.Core
         internal void UpdateState(ProcessState state)
         {
             State = state;
-            OnStateChange?.Invoke(this, new StateEventArgs(Id, State));
+            OnStateChange?.BeginInvoke(this, new StateEventArgs(Id, State), null, null);
             if (ParentId > 0)
             {
-                OnChildStateChange?.Invoke(this, new StateEventArgs(Id, State));
+                OnChildStateChange?.BeginInvoke(this, new StateEventArgs(Id, State), null, null);
             }
         }
 
@@ -204,9 +204,13 @@ namespace Warden.Core
         /// </summary>
         public event ProcessAddedHandler OnProcessAdded;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="args"></param>
         public void InvokeProcessAdd(ProcessAddedEventArgs args)
         {
-            OnProcessAdded?.Invoke(this, args);
+            OnProcessAdded?.BeginInvoke(this, args, null, null);
         }
 
         /// <summary>

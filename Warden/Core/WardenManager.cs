@@ -250,7 +250,7 @@ namespace Warden.Core
         private static void PreProcessing(string processName, int processId, string processPath, List<string> commandLine)
         {
             //needed for uri promises
-            Parallel.ForEach(ManagedProcesses.ToArray(), kvp =>
+            Parallel.ForEach(ManagedProcesses, kvp =>
             {
                 var process = kvp.Value;
                 if (process.Id < 999999)
@@ -269,14 +269,12 @@ namespace Warden.Core
                 {
                     return;
                 }
-                lock (process)
-                {
-                    ManagedProcesses[kvp.Key].Id = processId;
-                    ManagedProcesses[kvp.Key].Name = newProcesWithoutExt;
-                    ManagedProcesses[kvp.Key].Path = processPath;
-                    ManagedProcesses[kvp.Key].Arguments = commandLine;
-                    ManagedProcesses[kvp.Key]?.FoundCallback?.Invoke(true);
-                };
+
+                ManagedProcesses[kvp.Key].Id = processId;
+                ManagedProcesses[kvp.Key].Name = newProcesWithoutExt;
+                ManagedProcesses[kvp.Key].Path = processPath;
+                ManagedProcesses[kvp.Key].Arguments = commandLine;
+                ManagedProcesses[kvp.Key]?.FoundCallback?.BeginInvoke(true, null, null);
             });
         }
 
