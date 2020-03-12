@@ -92,13 +92,7 @@ namespace Warden.Core
             var epochTicks = new DateTime(1970, 1, 1).Ticks;
             var unixTime = ((DateTime.UtcNow.Ticks - epochTicks) / TimeSpan.TicksPerSecond);
             TimeStamp = unixTime;
-            if (Options.ReadFileHeaders && File.Exists(Path))
-            {
-                Headers = new PeHeaderReader(Path);
-            }
         }
-
-        public PeHeaderReader Headers { get; set; }
 
         [IgnoreDataMember] public readonly List<ProcessFilter> Filters;
 
@@ -375,14 +369,7 @@ namespace Warden.Core
             {
                 if (Options.KillWhitelist?.Any(x => Name.StartsWith(x, StringComparison.InvariantCultureIgnoreCase)) == false)
                 {
-                    if (Options.UseLegacyKill)
-                    {
-                        KillLegacy();
-                    }
-                    else
-                    {
-                        TaskKill();
-                    }
+                    TaskKill();
                 }
                 if (Children == null || Children.Count <= 0 || !Options.DeepKill)
                 {

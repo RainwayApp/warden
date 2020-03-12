@@ -35,16 +35,6 @@ namespace Warden.Core
         public bool DeepKill { get; set; }
 
         /// <summary>
-        /// If set to true, Warden will read the portable executable file headers for the binary.
-        /// </summary>
-        public bool ReadFileHeaders { get; set; }
-
-        /// <summary>
-        /// If set to true, Warden will kill processes via Process.Kill instead of Tskill
-        /// </summary>
-        public bool UseLegacyKill { get; set; }
-
-        /// <summary>
         /// Processes not to kill
         /// </summary>
         public IEnumerable<string> KillWhitelist { get; set; } = Array.Empty<string>();
