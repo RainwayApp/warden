@@ -80,7 +80,7 @@ namespace WardenExample
 
         private static void WardenManagerOnOnUntrackedProcessAdded(object sender, UntrackedProcessEventArgs e)
         {
-            Console.WriteLine(e.ProcessPath + " " + e.Id + " " + e.Name);
+            Console.WriteLine($"{e.ProcessPath} / {e.Id} / {e.Name}");
         }
     }
 }
