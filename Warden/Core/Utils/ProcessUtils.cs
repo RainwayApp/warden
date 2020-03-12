@@ -23,24 +23,32 @@ namespace Warden.Core.Utils
 
         public static IEnumerable<Process> GetChildProcesses(int id)
         {
-            var mos = new ManagementObjectSearcher($"Select * From Win32_Process Where ParentProcessID={id}");
-            return (from ManagementObject mo in mos.Get() select Process.GetProcessById(Convert.ToInt32(mo["ProcessID"]))).ToList();
-        }
-
-   
-        public static List<string> GetCommandLine(int id)
-        {
-            var commandLine = new StringBuilder();
-            commandLine.Append(" ");
-            using (var searcher = new ManagementObjectSearcher("SELECT CommandLine FROM Win32_Process WHERE ProcessId = " + id))
+            var processes = new List<Process>();
+            using (var mos = new ManagementObjectSearcher($"Select * From Win32_Process Where ParentProcessID={id}"))
             {
-                foreach (var @object in searcher.Get())
+                using (var collection = mos.Get())
                 {
-                    commandLine.Append(@object["CommandLine"]);
-                    commandLine.Append(" ");
+                    foreach (var mo in collection)
+                    {
+                        using (mo)
+                        {
+                            try
+                            {
+                                processes.Add(Process.GetProcessById(Convert.ToInt32(mo["ProcessID"])));
+                            }
+                            catch
+                            {
+                               //
+                            }
+                        }
+                    }
                 }
             }
-            var arguments = commandLine.ToString().Trim();
+            return processes;
+        }
+
+        public static List<string> GetCommandLineFromString(string arguments)
+        {
             if (string.IsNullOrWhiteSpace(arguments))
             {
                 return null;
@@ -51,6 +59,25 @@ namespace Warden.Core.Utils
             split.RemoveAt(0);
             arguments = string.Join(" ", split);
             return arguments.SplitSpace();
+        }
+
+        public static List<string> GetCommandLine(int id)
+        {
+            var commandLine = new StringBuilder();
+            commandLine.Append(" ");
+            using (var searcher = new ManagementObjectSearcher("SELECT CommandLine FROM Win32_Process WHERE ProcessId = " + id))
+            {
+                foreach (var @object in searcher.Get())
+                {
+                    using (@object)
+                    {
+                        commandLine.Append(@object["CommandLine"]);
+                        commandLine.Append(" ");
+                    }
+                }
+            }
+            var arguments = commandLine.ToString().Trim();
+            return string.IsNullOrWhiteSpace(arguments) ? null : GetCommandLineFromString(arguments);
         }
 
         public static Process GetProcess(string path)

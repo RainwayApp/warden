@@ -15,12 +15,14 @@ namespace WardenExample
         private static async Task Start()
         {
             WardenManager.Logger = new WardenLogger();
+            WardenManager.OnUntrackedProcessAdded += WardenManagerOnOnUntrackedProcessAdded;
             WardenManager.Initialize(new WardenOptions
             {
                 CleanOnExit = true,
                 DeepKill = true,
-                ReadFileHeaders = true
+                PollingInterval = TimeSpan.FromSeconds(1)
             });
+         
             Console.WriteLine("Press any key to continue");
             Console.ReadKey(true);
             Console.Write("Enter the process ID: ");
@@ -73,6 +75,11 @@ namespace WardenExample
                 };
             }
             Console.ReadKey(true);
+        }
+
+        private static void WardenManagerOnOnUntrackedProcessAdded(object sender, UntrackedProcessEventArgs e)
+        {
+            Console.WriteLine($"{e.ProcessPath} / {e.Id} / {e.Name} / {string.Join(" ", e.CommandLine?.ToArray() ?? new string[0])}");
         }
     }
 }

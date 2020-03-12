@@ -32,11 +32,13 @@ namespace Warden.Core
 
     public class ProcessAddedEventArgs : EventArgs
     {
-        public ProcessAddedEventArgs(string name, int parentId, int processId)
+        public ProcessAddedEventArgs(string name, int parentId, int processId, string processPath, List<string> commandLine)
         {
             Name = name;
             ParentId = parentId;
             Id = processId;
+            ProcessPath = processPath;
+            CommandLine = commandLine;
         }
 
         public ProcessAddedEventArgs()
@@ -48,12 +50,16 @@ namespace Warden.Core
         public int ParentId { get; internal set; }
 
         public int Id { get; internal set; }
+
+        public string ProcessPath { get; internal set; }
+
+        public List<string> CommandLine { get; internal set; }
     }
 
 
     public class UntrackedProcessEventArgs : ProcessAddedEventArgs
     {
-        public UntrackedProcessEventArgs(string name, int parentId, int processId) : base(name, parentId, processId) { }
+        public UntrackedProcessEventArgs(string name, int parentId, int processId, string processPath, List<string> commandLine) : base(name, parentId, processId, processPath, commandLine) { }
         public UntrackedProcessEventArgs() : base() { }
 
         public bool Create { get; set; } = false;
@@ -86,13 +92,7 @@ namespace Warden.Core
             var epochTicks = new DateTime(1970, 1, 1).Ticks;
             var unixTime = ((DateTime.UtcNow.Ticks - epochTicks) / TimeSpan.TicksPerSecond);
             TimeStamp = unixTime;
-            if (Options.ReadFileHeaders && File.Exists(Path))
-            {
-                Headers = new PeHeaderReader(Path);
-            }
         }
-
-        public PeHeaderReader Headers { get; set; }
 
         [IgnoreDataMember] public readonly List<ProcessFilter> Filters;
 
@@ -166,7 +166,7 @@ namespace Warden.Core
 
         private void OnChildOnStateChange(object sender, StateEventArgs stateEventArgs)
         {
-            OnChildStateChange?.Invoke(this, stateEventArgs);
+            OnChildStateChange?.BeginInvoke(this, stateEventArgs, null, null);
         }
 
         /// <summary>
@@ -176,10 +176,10 @@ namespace Warden.Core
         internal void UpdateState(ProcessState state)
         {
             State = state;
-            OnStateChange?.Invoke(this, new StateEventArgs(Id, State));
+            OnStateChange?.BeginInvoke(this, new StateEventArgs(Id, State), null, null);
             if (ParentId > 0)
             {
-                OnChildStateChange?.Invoke(this, new StateEventArgs(Id, State));
+                OnChildStateChange?.BeginInvoke(this, new StateEventArgs(Id, State), null, null);
             }
         }
 
@@ -198,9 +198,13 @@ namespace Warden.Core
         /// </summary>
         public event ProcessAddedHandler OnProcessAdded;
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="args"></param>
         public void InvokeProcessAdd(ProcessAddedEventArgs args)
         {
-            OnProcessAdded?.Invoke(this, args);
+            OnProcessAdded?.BeginInvoke(this, args, null, null);
         }
 
         /// <summary>
@@ -365,14 +369,7 @@ namespace Warden.Core
             {
                 if (Options.KillWhitelist?.Any(x => Name.StartsWith(x, StringComparison.InvariantCultureIgnoreCase)) == false)
                 {
-                    if (Options.UseLegacyKill)
-                    {
-                        KillLegacy();
-                    }
-                    else
-                    {
-                        TaskKill();
-                    }
+                    TaskKill();
                 }
                 if (Children == null || Children.Count <= 0 || !Options.DeepKill)
                 {
@@ -601,20 +598,26 @@ namespace Warden.Core
         /// </summary>
         /// <param name="pId"></param>
         /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
+        /// <param name="processPath"></param>
+        /// <param name="commandLine"></param>
+        /// <param name="track"></param>
         /// <returns></returns>
-        public static WardenProcess GetProcessFromId(int pId, List<ProcessFilter> filters = null)
+        public static WardenProcess GetProcessFromId(int pId, List<ProcessFilter> filters = null,
+            string processPath = null, List<string> commandLine = null, bool track = true)
         {
-            var process = BuildTreeById(pId, filters);
+            var process = BuildTreeById(pId, filters, processPath, commandLine);
             if (process == null)
             {
                 return null;
             }
+            if (!track) return process;
             var key = Guid.NewGuid();
             ManagedProcesses[key] = process;
             return ManagedProcesses[key];
         }
 
-        private static WardenProcess BuildTreeById(int pId, List<ProcessFilter> filters)
+
+        private static WardenProcess BuildTreeById(int pId, List<ProcessFilter> filters, string processPath, List<string> commandLine)
         {
             try
             {
@@ -629,19 +632,19 @@ namespace Warden.Core
                 }
                 var processName = process.ProcessName;
                 var processId = process.Id;
-                var path = GetProcessPath(processId);
+                var path = processPath ?? GetProcessPath(processId);
                 var state = process.HasExited ? ProcessState.Dead : ProcessState.Alive;
-                var arguments = GetCommandLine(processId);
+                var arguments = commandLine ?? GetCommandLine(processId);
                 var type = IsWindowsApp(path) ? ProcessTypes.Uwp : ProcessTypes.Win32;
                 var warden = new WardenProcess(processName, processId, path, state, arguments, type, filters);
                 var children = GetChildProcesses(pId);
                 foreach (var child in children)
                 {
-                    warden.AddChild(BuildTreeById(child.Id, filters));
+                    warden.AddChild(BuildTreeById(child.Id, filters, null, null));
                 }
                 return new WardenProcess(processName, processId, path, state, arguments, type, filters);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 return null;
             }
@@ -653,13 +656,15 @@ namespace Warden.Core
         /// <param name="name"></param>
         /// <param name="parentId"></param>
         /// <param name="id"></param>
+        /// <param name="path"></param>
+        /// <param name="commandLineArguments"></param>
         /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
         /// <returns>A WardenProcess that will be added to a child list.</returns>
-        internal static WardenProcess CreateProcessFromId(string name, int parentId, int id,
+        internal static WardenProcess CreateProcessFromId(string name, int parentId, int id, string path,
+            List<string> commandLineArguments,
             List<ProcessFilter> filters)
         {
-            var path = GetProcessPath(id);
-            var arguments = GetCommandLine(id);
+            
             WardenProcess warden;
             try
             {
@@ -667,7 +672,7 @@ namespace Warden.Core
                 var processName = process.ProcessName;
                 var processId = process.Id;
                 var state = process.HasExited ? ProcessState.Dead : ProcessState.Alive;
-                warden = new WardenProcess(processName, processId, path, state, arguments, ProcessTypes.Win32, filters);
+                warden = new WardenProcess(processName, processId, path, state, commandLineArguments, ProcessTypes.Win32, filters);
                 warden.SetParent(parentId);
                 return warden;
             }
@@ -675,7 +680,7 @@ namespace Warden.Core
             {
                 //
             }
-            warden = new WardenProcess(name, id, path, ProcessState.Dead, arguments, ProcessTypes.Win32, filters);
+            warden = new WardenProcess(name, id, path, ProcessState.Dead, commandLineArguments, ProcessTypes.Win32, filters);
             warden.SetParent(parentId);
             return warden;
         }

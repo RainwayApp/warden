@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Warden</RootNamespace>
     <AssemblyName>Warden</AssemblyName>
-    <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -37,15 +37,12 @@
     <DocumentationFile>bin\Release\Warden.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.Win32.Registry" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Design" />
     <Reference Include="System.Management" />
     <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.Security.AccessControl" />
-    <Reference Include="System.Security.Principal.Windows" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Core\DummyWardenLogger.cs" />
@@ -53,12 +50,12 @@
     <Compile Include="Core\Exceptions\WardenException.cs" />
     <Compile Include="Core\Exceptions\WardenManageException.cs" />
     <Compile Include="Core\Exceptions\WardenLaunchException.cs" />
+    <Compile Include="Core\Extensions\WmiExtensions.cs" />
     <Compile Include="Core\Launchers\ILauncher.cs" />
     <Compile Include="Core\Launchers\UriLauncher.cs" />
     <Compile Include="Core\Launchers\UwpLauncher.cs" />
     <Compile Include="Core\Launchers\Win32Launcher.cs" />
     <Compile Include="Core\Models\ProcessFilter.cs" />
-    <Compile Include="Core\Utils\PeHeader.cs" />
     <Compile Include="Core\Utils\ProcessUtils.cs" />
     <Compile Include="Core\Utils\ShutdownUtils.cs" />
     <Compile Include="Core\Utils\StringUtils.cs" />
@@ -80,12 +77,13 @@
     <Compile Include="Windows\ApplicationActivationManager.cs" />
     <Compile Include="Windows\IApplicationActivationManager.cs" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Win32.Registry">
+      <Version>4.7.0</Version>
+    </PackageReference>
+  </ItemGroup>
   <ItemGroup>
     <None Include=".editorconfig" />
-    <None Include="packages.config">
-      <SubType>Designer</SubType>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">
