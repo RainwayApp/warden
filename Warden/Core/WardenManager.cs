@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
+using Warden.Core.Extensions;
 using Warden.Core.Utils;
 using Warden.Properties;
 using Warden.Windows;
@@ -62,9 +63,15 @@ namespace Warden.Core
         public static IWardenLogger Logger = new DummyWardenLogger();
 
         public static ConcurrentDictionary<Guid, WardenProcess> ManagedProcesses = new ConcurrentDictionary<Guid, WardenProcess>();
+        private static ManagementScope _connectionScope;
+        private static ConnectionOptions _wmiOptions;
+        private static Thread CreationThread { get; set; }
+        private static Thread DestructionThread { get; set; }
 
         public delegate void UntrackedProcessHandler(object sender, UntrackedProcessEventArgs e);
         public static event UntrackedProcessHandler OnUntrackedProcessAdded;
+
+
 
 
         /// <summary>
@@ -83,21 +90,36 @@ namespace Warden.Core
             try
             {
                 ShutdownUtils.RegisterEvents();
-                var wmiOptions = new ConnectionOptions
+
+
+                _wmiOptions = new ConnectionOptions
                 {
                     Authentication = AuthenticationLevel.Default,
                     EnablePrivileges = true,
                     Impersonation = ImpersonationLevel.Impersonate,
                     Timeout = TimeSpan.MaxValue
                 };
-                var scope = new ManagementScope($@"\\{Environment.MachineName}\root\cimv2", wmiOptions);
-                scope.Connect();
-                _processStartEvent = new ManagementEventWatcher(scope, new WqlEventQuery("__InstanceCreationEvent", options.PollingInterval, "TargetInstance isa \"Win32_Process\""));
-                _processStartEvent.EventArrived += ProcessStarted;
-                _processStopEvent = new ManagementEventWatcher(scope, new WqlEventQuery("__InstanceDeletionEvent", options.PollingInterval, "TargetInstance isa \"Win32_Process\""));
-                _processStopEvent.EventArrived += ProcessStopped;
-                _processStartEvent.Start();
-                _processStopEvent.Start();
+
+                _connectionScope = new ManagementScope($@"\\{Environment.MachineName}\root\cimv2", _wmiOptions);
+                _connectionScope.Connect();
+
+                var creationThreadStarted = new ManualResetEvent(false);
+                CreationThread = new Thread(StartCreationListener)
+                {
+                    IsBackground = true
+                };
+                CreationThread.Start(creationThreadStarted);
+
+                var destructionThreadStarted = new ManualResetEvent(false);
+                DestructionThread = new Thread(StartDestructionListener)
+                {
+                    IsBackground = true
+                };
+                DestructionThread.Start(destructionThreadStarted);
+
+
+                creationThreadStarted.WaitOne();
+                destructionThreadStarted.WaitOne();
                 Initialized = true;
                 Logger?.Info("Initialized");
             }
@@ -105,6 +127,24 @@ namespace Warden.Core
             {
                 throw new WardenException(ex.Message, ex);
             }
+        }
+
+        private static void StartDestructionListener(object data)
+        {
+            var resetEvent = (ManualResetEvent) data;
+            _processStopEvent = new ManagementEventWatcher(_connectionScope, new WqlEventQuery("__InstanceDeletionEvent", Options.PollingInterval, "TargetInstance isa \"Win32_Process\""));
+            _processStopEvent.EventArrived += ProcessStopped;
+            _processStopEvent.Start();
+            resetEvent.Set();
+        }
+
+        private static void StartCreationListener(object data)
+        {
+            var resetEvent = (ManualResetEvent)data;
+            _processStartEvent = new ManagementEventWatcher(_connectionScope, new WqlEventQuery("__InstanceCreationEvent", Options.PollingInterval, "TargetInstance isa \"Win32_Process\""));
+            _processStartEvent.EventArrived += ProcessStarted;
+            _processStartEvent.Start();
+            resetEvent.Set();
         }
 
         public static bool Initialized { get; private set; }
@@ -141,18 +181,15 @@ namespace Warden.Core
                 var processId      = int.Parse(targetInstance["ProcessId"].ToString());
                 targetInstance.Dispose();
                 e.NewEvent.Dispose();
-                Logger?.Debug($"{processId} stopped");
-                new Thread(() =>
-                           {
-                               try
-                               {
-                                   HandleStoppedProcess(processId);
-                               }
-                               catch(Exception ex)
-                               {
-                                   Logger?.Error(ex.ToString());
-                               }                                   
-                           }).Start();
+                try
+                {
+                    HandleStoppedProcess(processId);
+                    Logger?.Debug($"{processId} stopped");
+                }
+                catch (Exception ex)
+                {
+                    Logger?.Error(ex.ToString());
+                }
             }
             catch(Exception ex)
             {
@@ -195,15 +232,22 @@ namespace Warden.Core
                     managed.Kill();
                 });
             }
+
+            _connectionScope = null;
             ManagedProcesses.Clear();
+            CreationThread?.Join();
+            DestructionThread?.Join();
         }
+
         /// <summary>
         /// Uri launches when done asynchronously are stored with a large process id
         /// We then loop over our stored tree and see if the newly created process matches the target of our async launch
         /// </summary>
         /// <param name="processName"></param>
         /// <param name="processId"></param>
-        private static void PreProcessing(string processName, int processId)
+        /// <param name="processPath"></param>
+        /// <param name="commandLine"></param>
+        private static void PreProcessing(string processName, int processId, string processPath, List<string> commandLine)
         {
             //needed for uri promises
             Parallel.ForEach(ManagedProcesses.ToArray(), kvp =>
@@ -229,8 +273,8 @@ namespace Warden.Core
                 {
                     ManagedProcesses[kvp.Key].Id = processId;
                     ManagedProcesses[kvp.Key].Name = newProcesWithoutExt;
-                    ManagedProcesses[kvp.Key].Path = ProcessUtils.GetProcessPath(processId);
-                    ManagedProcesses[kvp.Key].Arguments = ProcessUtils.GetCommandLine(processId);
+                    ManagedProcesses[kvp.Key].Path = processPath;
+                    ManagedProcesses[kvp.Key].Arguments = commandLine;
                     ManagedProcesses[kvp.Key]?.FoundCallback?.Invoke(true);
                 };
             });
@@ -251,11 +295,22 @@ namespace Warden.Core
                 var processId = int.Parse(targetInstance["ProcessId"].ToString());
                 var processParent = int.Parse(targetInstance["ParentProcessId"].ToString());
                 var processName = targetInstance["Name"].ToString().Trim();
-                if(processName == "?")
+                var processPath = targetInstance.TryGetProperty<string>("ExecutablePath")?.Trim();
+                if (string.IsNullOrWhiteSpace(processPath))
+                {
+                    processPath = ProcessUtils.GetProcessPath(processId)?.Trim();
+                    if (string.IsNullOrWhiteSpace(processPath))
+                    {
+                        processPath = "Unknown";
+                    }
+                }
+                var commandLineArguments = ProcessUtils.GetCommandLineFromString(targetInstance.TryGetProperty<string>("CommandLine")?.Trim());
+
+                if (processName == "?" && !processPath.Equals("Unknown"))
                 {
                     try
                     {
-                        processName = Path.GetFileName(ProcessUtils.GetProcessPath(processId))?.Trim();
+                        processName = Path.GetFileName(processPath)?.Trim();
                         if (string.IsNullOrWhiteSpace(processName))
                             processName = "Unknown";
                     }
@@ -267,10 +322,10 @@ namespace Warden.Core
                 }
                 targetInstance.Dispose();
                 e.NewEvent.Dispose();
-                Logger?.Debug($"{processName} ({processId}) started by {processParent}");
-                PreProcessing(processName, processId);
-                HandleNewProcess(processName, processId, processParent);
-                HandleUnknownProcess(processName, processId, processParent);
+              //  Logger?.Debug(processName +  " / " + processId + " / " + processPath);
+                PreProcessing(processName, processId, processPath, commandLineArguments);
+                HandleNewProcess(processName, processId, processParent, processPath, commandLineArguments);
+                HandleUnknownProcess(processName, processId, processParent, processPath, commandLineArguments);
             }
 
             catch (Exception ex)
@@ -285,28 +340,31 @@ namespace Warden.Core
         /// <param name="processName"></param>
         /// <param name="processId"></param>
         /// <param name="processParent"></param>
-        private static void HandleUnknownProcess(string processName, int processId, int processParent)
+        /// <param name="processPath"></param>
+        /// <param name="commandLineArguments"></param>
+        private static void HandleUnknownProcess(string processName, int processId, int processParent, string processPath, List<string> commandLineArguments)
         {
             if(OnUntrackedProcessAdded == null)
             {
                 return;
             }
+          
             if(!ManagedProcesses.Values.AsParallel().Any(x => x.Id == processId || x.FindChildById(processId) != null))
             {
-                var @event = new UntrackedProcessEventArgs(processName, processId, processParent);
-                foreach(UntrackedProcessHandler Invoke in OnUntrackedProcessAdded.GetInvocationList())
+                var @event = new UntrackedProcessEventArgs(processName, processParent, processId, processPath, commandLineArguments);
+                foreach(var @delegate in OnUntrackedProcessAdded.GetInvocationList())
                 {
+                    var invoke = (UntrackedProcessHandler) @delegate;
                     @event.Filters = null;
                     @event.Callback = null;
-                    Invoke(null, @event);
+                    invoke(null, @event);
                     if(@event.Create)
                     {
-                        @event.Callback?.Invoke(GetProcessFromId(processId, @event.Filters));
+                        @event.Callback?.BeginInvoke(GetProcessFromId(processId, @event.Filters, processPath, commandLineArguments, false), null, null);
                     }
                 }
             }
         }
-
 
 
         /// <summary>
@@ -315,13 +373,16 @@ namespace Warden.Core
         /// <param name="processName"></param>
         /// <param name="processId"></param>
         /// <param name="processParent"></param>
-        private static void HandleNewProcess(string processName, int processId, int processParent)
+        /// <param name="processPath"></param>
+        /// <param name="commandLineArguments"></param>
+        private static void HandleNewProcess(string processName, int processId, int processParent, string processPath,
+            List<string> commandLineArguments)
         {
             Parallel.ForEach(ManagedProcesses.Values, managed =>
             {
                 if (managed.Id == processParent)
                 {
-                    var childProcess = CreateProcessFromId(processName, managed.Id, processId, managed.Filters);
+                    var childProcess = CreateProcessFromId(processName, managed.Id, processId, processPath, commandLineArguments, managed.Filters);
                     if (!childProcess.IsFiltered() && managed.AddChild(childProcess))
                     {
                         managed.InvokeProcessAdd(new ProcessAddedEventArgs
@@ -339,7 +400,7 @@ namespace Warden.Core
                 {
                     return;
                 }
-                var grandChild = CreateProcessFromId(processName, child.Id, processId, child.Filters);
+                var grandChild = CreateProcessFromId(processName, child.Id, processId,  processPath, commandLineArguments, child.Filters);
                 if (!grandChild.IsFiltered() && child.AddChild(grandChild))
                 {
                     managed.InvokeProcessAdd(new ProcessAddedEventArgs

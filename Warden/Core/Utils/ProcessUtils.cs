@@ -23,11 +23,52 @@ namespace Warden.Core.Utils
 
         public static IEnumerable<Process> GetChildProcesses(int id)
         {
-            var mos = new ManagementObjectSearcher($"Select * From Win32_Process Where ParentProcessID={id}");
-            return (from ManagementObject mo in mos.Get() select Process.GetProcessById(Convert.ToInt32(mo["ProcessID"]))).ToList();
+            var processes = new List<Process>();
+            using (var mos = new ManagementObjectSearcher($"Select * From Win32_Process Where ParentProcessID={id}"))
+            {
+                using (var collection = mos.Get())
+                {
+                    foreach (var mo in collection)
+                    {
+                        using (mo)
+                        {
+                            try
+                            {
+                                processes.Add(Process.GetProcessById(Convert.ToInt32(mo["ProcessID"])));
+                            }
+                            catch
+                            {
+                               //
+                            }
+                        }
+                    }
+                }
+            }
+            return processes;
         }
 
-   
+        public static List<string> GetCommandLineFromString(string processData)
+        {
+            if (string.IsNullOrWhiteSpace(processData))
+            {
+                return null;
+            }
+            var commandLine = new StringBuilder();
+            commandLine.Append(" ");
+            commandLine.Append(processData);
+            var arguments = commandLine.ToString().Trim();
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                return null;
+            }
+            const string strRegex = @"[ ](?=(?:[^""]*""[^""]*"")*[^""]*$)";
+            var myRegex = new Regex(strRegex, RegexOptions.IgnoreCase);
+            var split = myRegex.Split(arguments).ToList();
+            split.RemoveAt(0);
+            arguments = string.Join(" ", split);
+            return arguments.SplitSpace();
+        }
+
         public static List<string> GetCommandLine(int id)
         {
             var commandLine = new StringBuilder();
@@ -36,8 +77,11 @@ namespace Warden.Core.Utils
             {
                 foreach (var @object in searcher.Get())
                 {
-                    commandLine.Append(@object["CommandLine"]);
-                    commandLine.Append(" ");
+                    using (@object)
+                    {
+                        commandLine.Append(@object["CommandLine"]);
+                        commandLine.Append(" ");
+                    }
                 }
             }
             var arguments = commandLine.ToString().Trim();
