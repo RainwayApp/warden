@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Warden.Core;
 using Warden.Core.Exceptions;
 using Warden.Properties;
+using Warden.Windows.Uwp;
 
 namespace Warden.Windows
 {
@@ -15,13 +16,15 @@ namespace Warden.Windows
     {
         #region uac
 
-        /// <summary>
-        ///     Launches the given application with full admin rights, and in addition bypasses the Vista UAC prompt
-        /// </summary>
-        /// <param name="applicationName">The name of the application to launch</param>
-        /// <param name="procInfo">Process information regarding the launched application that gets returned to the caller</param>
-        /// <returns></returns>
-        public static bool StartProcessAndBypassUac(string applicationName, out PROCESS_INFORMATION procInfo, string workingDir)
+            /// <summary>
+            ///     Launches the given application with full admin rights, and in addition bypasses the Vista UAC prompt
+            /// </summary>
+            /// <param name="applicationName">The name of the application to launch</param>
+            /// <param name="arguments"></param>
+            /// <param name="workingDir"></param>
+            /// <param name="procInfo">Process information regarding the launched application that gets returned to the caller</param>
+            /// <returns></returns>
+            public static bool StartProcessAndBypassUac(string applicationName, string arguments, string workingDir, out PROCESS_INFORMATION procInfo)
         {
             uint winlogonPid = 0;
             IntPtr hUserTokenDup = IntPtr.Zero, hPToken = IntPtr.Zero;
@@ -107,8 +110,8 @@ namespace Warden.Windows
 
             // create a new process in the current user's logon session
             var result = CreateProcessAsUser(hUserTokenDup, // client's access token
-                null, // file to execute
-                applicationName, // command line
+                applicationName, // file to execute
+                arguments, // command line
                 ref sa, // pointer to process SECURITY_ATTRIBUTES
                 ref sa, // pointer to thread SECURITY_ATTRIBUTES
                 false, // handles are not inheritable
@@ -251,44 +254,7 @@ namespace Warden.Windows
 #endregion
 
 
-        /// <summary>
-        ///     Launch a UWP App using a ApplicationActivationManager and sets a internal id to launched proccess id
-        /// </summary>
-        /// <param name="packageFamilyName">The AUMID of the app to launch</param>
-        /// <param name="pId"></param>
-        /// <param name="arguments"></param>
-        public static Task<int> LaunchUwpApp(string packageFamilyName, string arguments) // No async because the method does not need await
-        {
-            return Task.Run(() =>
-            {
-                using (new WardenImpersonator())
-                {
-                    var mgr = new ApplicationActivationManager();
-                    try
-                    {
-                        mgr.ActivateApplication(packageFamilyName, arguments, ActivateOptionsEnum.None,
-                            out var processId);
-                        var pId = (int) processId;
-                        return pId;
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new WardenLaunchException(
-                            string.Format(Resources.Exception_Error_Trying_To_Launch_App, ex.Message), ex);
-                    }
-                }
-            });
-        }
-
-        public static bool IsAdmin()
-        {
-            using (var identity = WindowsIdentity.GetCurrent())
-            {
-               var principal = new WindowsPrincipal(identity);
-               return principal.IsInRole(WindowsBuiltInRole.Administrator);
-            }
-        }
-
+       
         [DllImport("Kernel32")]
         internal static extern bool SetConsoleCtrlHandler(HandlerRoutine handler, bool add);
 

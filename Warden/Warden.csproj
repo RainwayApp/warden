@@ -51,11 +51,8 @@
     <Compile Include="Core\Exceptions\WardenManageException.cs" />
     <Compile Include="Core\Exceptions\WardenLaunchException.cs" />
     <Compile Include="Core\Extensions\WmiExtensions.cs" />
-    <Compile Include="Core\Launchers\ILauncher.cs" />
-    <Compile Include="Core\Launchers\UriLauncher.cs" />
-    <Compile Include="Core\Launchers\UwpLauncher.cs" />
-    <Compile Include="Core\Launchers\Win32Launcher.cs" />
     <Compile Include="Core\Models\ProcessFilter.cs" />
+    <Compile Include="Core\Utils\PathUtils.cs" />
     <Compile Include="Core\Utils\ProcessUtils.cs" />
     <Compile Include="Core\Utils\ShutdownUtils.cs" />
     <Compile Include="Core\Utils\StringUtils.cs" />
@@ -66,6 +63,7 @@
     <Compile Include="Core\WardenManager.cs" />
     <Compile Include="Core\WardenProcess.cs" />
     <Compile Include="Core\WardenEnums.cs" />
+    <Compile Include="Core\WardenStartInfo.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
@@ -74,8 +72,12 @@
     </Compile>
     <Compile Include="Windows\ActivateOptions.cs" />
     <Compile Include="Windows\Api.cs" />
-    <Compile Include="Windows\ApplicationActivationManager.cs" />
-    <Compile Include="Windows\IApplicationActivationManager.cs" />
+    <Compile Include="Windows\Uwp\ApplicationActivationManager.cs" />
+    <Compile Include="Windows\Uwp\IApplicationActivationManager.cs" />
+    <Compile Include="Windows\Privileges.cs" />
+    <Compile Include="Windows\Uwp\UwpShell.cs" />
+    <Compile Include="Windows\Win32\UserShell.cs" />
+    <Compile Include="Windows\Win32\UriShell.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Win32.Registry">
@@ -91,5 +93,6 @@
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

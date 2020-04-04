@@ -12,6 +12,17 @@ namespace Warden.Core.Utils
 {
     internal static class ProcessUtils
     {
+        private static readonly Random GetRandom = new Random();
+
+
+        public static int GenerateProcessId()
+        {
+            lock (GetRandom) // synchronize
+            {
+                return GetRandom.Next(1000000, 2000000);
+            }
+        }
+
 
         [DllImport("Kernel32.dll")]
         static extern uint QueryFullProcessImageName(IntPtr hProcess, uint flags, StringBuilder text, out uint size);
@@ -93,17 +104,6 @@ namespace Warden.Core.Utils
             }
         }
 
-        public static string NormalizePath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return path;
-            }
-            return Path.GetFullPath(new Uri(path).LocalPath)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                .ToUpperInvariant();
-        }
-
         public static string GetProcessPath(int processId)
         {
             var pathToExe = string.Empty;
@@ -117,7 +117,7 @@ namespace Warden.Core.Utils
                 if (0 != success)
                 {
                     pathToExe = buff.ToString();
-                    pathToExe = NormalizePath(buff.ToString());
+                    pathToExe = PathUtils.NormalizePath(buff.ToString());
                 }
             }
             catch

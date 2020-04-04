@@ -9,7 +9,6 @@
     public enum ProcessTypes
     {
         Win32 = 0,
-        Uwp = 1,
-        Uri = 2
+        Uwp = 1
     }
 }

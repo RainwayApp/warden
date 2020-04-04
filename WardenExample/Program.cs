@@ -7,12 +7,7 @@ namespace WardenExample
 {
     class Program
     {
-        static void Main(string[] args)
-        {
-            Start().GetAwaiter().GetResult();
-        }
-
-        private static async Task Start()
+        static void Main(string[] ars)
         {
             WardenManager.Logger = new WardenLogger();
             WardenManager.OnUntrackedProcessAdded += WardenManagerOnOnUntrackedProcessAdded;
@@ -22,8 +17,8 @@ namespace WardenExample
                 DeepKill = true,
                 PollingInterval = TimeSpan.FromSeconds(1)
             });
-         
-            Console.WriteLine("Press any key to continue");
+
+        /*    Console.WriteLine("Press any key to continue");
             Console.ReadKey(true);
             Console.Write("Enter the process ID: ");
             var processId = int.Parse(Console.ReadLine());
@@ -62,11 +57,15 @@ namespace WardenExample
                 Console.WriteLine(JsonConvert.SerializeObject(test, Formatting.Indented));
                 test.Kill();
             }
-            
-           
 
+
+    */
             Console.WriteLine("Start notepad");
-            var wardenTest = await WardenProcess.Start("notepad", string.Empty, null);
+            var wardenTest = WardenProcess.StartUwp(new WardenStartInfo
+            {
+                PackageFamilyName = "Microsoft.Halo5Forge_8wekyb3d8bbwe",
+                ApplicationId = "Ausar"
+            });
             if (wardenTest != null)
             {
                 wardenTest.OnStateChange += delegate (object sender, StateEventArgs args)
@@ -77,6 +76,7 @@ namespace WardenExample
             Console.ReadKey(true);
         }
 
+     
         private static void WardenManagerOnOnUntrackedProcessAdded(object sender, UntrackedProcessEventArgs e)
         {
             Console.WriteLine($"{e.ProcessPath} / {e.Id} / {e.Name} / {string.Join(" ", e.CommandLine?.ToArray() ?? new string[0])}");
