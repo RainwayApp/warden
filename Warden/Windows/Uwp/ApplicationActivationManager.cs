@@ -9,7 +9,7 @@ namespace Warden.Windows.Uwp
     /// </summary>
     [ComImport]
     [Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
-    public class ApplicationActivationManager : IApplicationActivationManager
+    internal class ApplicationActivationManager : IApplicationActivationManager
     {
         /// <summary>
         /// Activates the specified Windows Store app for the generic launch contract (Windows.Launch) in the current session.

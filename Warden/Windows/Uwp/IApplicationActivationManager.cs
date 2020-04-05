@@ -9,7 +9,7 @@ namespace Warden.Windows.Uwp
     [ComImport]
     [Guid("2e941141-7f97-4756-ba1d-9decde894a3d")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    public interface IApplicationActivationManager
+    internal interface IApplicationActivationManager
     {
         /// <summary>
         /// Activates the specified Windows Store app for the generic launch contract (Windows.Launch) in the current session.

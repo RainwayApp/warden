@@ -40,6 +40,7 @@ namespace WardenExample
 
             if (wardenTest != null)
             {
+              
 
                 Console.WriteLine($"Hello {wardenTest.Id}");
                 wardenTest.OnStateChange += delegate (object sender, StateEventArgs args)

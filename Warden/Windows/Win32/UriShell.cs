@@ -14,7 +14,7 @@ namespace Warden.Windows.Win32
     /// <summary>
     /// A class for launching Win32 processes via an application URI scheme.
     /// </summary>
-    public static class UriShell
+    internal static class UriShell
     {
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace Warden.Windows.Win32
         /// </summary>
         /// <param name="startInfo"></param>
         /// <returns></returns>
-        public static bool LaunchUriDeferred(WardenStartInfo startInfo)
+        internal static bool LaunchUriDeferred(WardenStartInfo startInfo)
         {
             var (fileName, arguments, workingDirectory) = ValidateUri(startInfo);
             if (startInfo.AsUser)
@@ -93,7 +93,7 @@ namespace Warden.Windows.Win32
         /// <param name="startInfo"></param>
         /// <param name="cancelToken">A cancellation token to configure how long Warden will wait.</param>
         /// <returns></returns>
-        public static async Task<bool> LaunchUri(WardenStartInfo startInfo, CancellationTokenSource cancelToken)
+        internal static async Task<bool> LaunchUri(WardenStartInfo startInfo, CancellationTokenSource cancelToken)
         {
             var (fileName, arguments, workingDirectory) = ValidateUri(startInfo);
 

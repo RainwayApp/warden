@@ -11,7 +11,7 @@ namespace Warden.Core.Utils
 {
     /// <summary>
     /// </summary>
-    public static class PathUtils
+    internal static class PathUtils
     {
         /// <summary>
         ///     Regex for matching a mapped executable path: C:\Test\Path\File.exe
@@ -39,7 +39,7 @@ namespace Warden.Core.Utils
         /// </summary>
         /// <param name="command">the string that is known to contain all of a processes arguments</param>
         /// <returns></returns>
-        public static string FindCommandLineArguments(string command)
+        internal static string FindCommandLineArguments(string command)
         {
             var executable = FindFullyQualifiedName(command);
             var matches = ProgramArguments.Matches(command);
@@ -61,7 +61,7 @@ namespace Warden.Core.Utils
         /// </summary>
         /// <param name="command">the string that is known to possibly contain an executable path.</param>
         /// <returns></returns>
-        public static string FindFullyQualifiedName(string command)
+        internal static string FindFullyQualifiedName(string command)
         {
             var match = ProgramPath.Match(command);
             return match.Success ? NormalizePath(match.Value) : null;
@@ -73,7 +73,7 @@ namespace Warden.Core.Utils
         /// </summary>
         /// <param name="path">The path of a file or directory.</param>
         /// <returns></returns>
-        public static string GetDirectoryName(string path)
+        internal static string GetDirectoryName(string path)
         {
             return NormalizePath(new FileInfo(path).DirectoryName);
         }
@@ -104,7 +104,7 @@ namespace Warden.Core.Utils
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static string NormalizePath(string path)
+        internal static string NormalizePath(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
             {

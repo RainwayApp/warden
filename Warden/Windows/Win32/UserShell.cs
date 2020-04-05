@@ -9,14 +9,14 @@ namespace Warden.Windows.Win32
     /// <summary>
     /// 
     /// </summary>
-    public static class UserShell
+    internal static class UserShell
     {
         /// <summary>
         /// 
         /// </summary>
         /// <param name="startInfo"></param>
         /// <returns></returns>
-        public static WardenProcess LaunchWin32App(WardenStartInfo startInfo)
+        internal static WardenProcess LaunchWin32App(WardenStartInfo startInfo)
         {
             if (!new FileInfo(startInfo.FileName).Exists)
             {

@@ -56,7 +56,7 @@ namespace Warden.Windows
     /// <summary>
     /// A static class that contains utility functions relating to user privileges 
     /// </summary>
-    public static class Privileges
+    internal static class Privileges
     {
         [DllImport("advapi32.dll", SetLastError = true)]
         static extern bool GetTokenInformation(IntPtr tokenHandle, TokenInformationClass tokenInformationClass, IntPtr tokenInformation, int tokenInformationLength, out int returnLength);

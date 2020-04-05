@@ -19,7 +19,7 @@ namespace Warden.Windows
             /// <param name="workingDir"></param>
             /// <param name="procInfo">Process information regarding the launched application that gets returned to the caller</param>
             /// <returns></returns>
-            public static bool StartProcessAndBypassUac(string applicationName, string arguments, string workingDir, out PROCESS_INFORMATION procInfo)
+            internal static bool StartProcessAndBypassUac(string applicationName, string arguments, string workingDir, out PROCESS_INFORMATION procInfo)
         {
             uint winlogonPid = 0;
             IntPtr hUserTokenDup = IntPtr.Zero, hPToken = IntPtr.Zero;

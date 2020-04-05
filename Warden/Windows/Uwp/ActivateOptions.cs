@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace Warden.Windows
+namespace Warden.Windows.Uwp
 {
     [Flags]
-    public enum ActivateOptionsEnum
+    internal enum ActivateOptionsEnum
     {
         None = 0,
         DesignMode = 0x1,

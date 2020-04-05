@@ -9,14 +9,14 @@ namespace Warden.Windows.Uwp
     /// <summary>
     /// A class for launching and handling UWP applications
     /// </summary>
-    public static class UwpShell
+    internal static class UwpShell
     {
         /// <summary>
         /// Combines the Package Family Name and Application ID into a valid AUMID string and then launches the app.
         /// </summary>
         /// <param name="startInfo"></param>
         /// <returns>If the app is launched successfully a WardenProcess is returned.</returns>
-        public static WardenProcess LaunchApp(WardenStartInfo startInfo)
+        internal static WardenProcess LaunchApp(WardenStartInfo startInfo)
         {
             var aumid = $"{startInfo.PackageFamilyName}!{startInfo.ApplicationId}";
             var processId = Launch(aumid, startInfo.Arguments);

@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace Warden.Core.Utils
 {
-    public static class StringUtils
+    internal static class StringUtils
     {
       
         public static List<string> SplitSpace(this string input)
