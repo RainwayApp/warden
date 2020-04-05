@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Warden.Core;
@@ -7,6 +8,7 @@ namespace WardenExample
 {
     class Program
     {
+       
         static void Main(string[] ars)
         {
             WardenManager.Logger = new WardenLogger();
@@ -18,59 +20,50 @@ namespace WardenExample
                 PollingInterval = TimeSpan.FromSeconds(1)
             });
 
-        /*    Console.WriteLine("Press any key to continue");
-            Console.ReadKey(true);
-            Console.Write("Enter the process ID: ");
-            var processId = int.Parse(Console.ReadLine());
-            var test = WardenProcess.GetProcessFromId(processId);
-            if (test != null)
+            Console.WriteLine("Start notepad");
+           /* var wardenTest = WardenProcess.StartUwp(new WardenStartInfo
             {
-                test.OnProcessAdded += delegate (object sender, ProcessAddedEventArgs args)
+                PackageFamilyName = "Microsoft.MinecraftUWP_8wekyb3d8bbwe",
+                ApplicationId = "App"
+            });*/
+
+           var cancel = new CancellationTokenSource();
+           cancel.CancelAfter(TimeSpan.FromSeconds(10));
+           var wardenTest = WardenProcess.StartUriDeferred(new WardenStartInfo
+           {
+               FileName = "steam://run/107410",
+               TargetFileName = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Arma 3\\arma3launcher.exe"
+           }, delegate(bool b)
+           {
+               Console.WriteLine($"Alive! {b}");
+           });
+
+            if (wardenTest != null)
+            {
+
+                Console.WriteLine($"Hello {wardenTest.Id}");
+                wardenTest.OnStateChange += delegate (object sender, StateEventArgs args)
                 {
-                    if (args.ParentId == test.Id)
+                    Console.WriteLine($"---\nName: {wardenTest.Name}\nId: {wardenTest.Id}\nstate changed to {args.State}\n---");
+                    if (!wardenTest.IsTreeActive())
                     {
-                        Console.WriteLine($"Added child {args.Name}({args.Id}) to root process {test.Name}({test.Id})");
-                    }
-                    else
-                    {
-                        var parentInfo = test.FindChildById(args.ParentId);
-                        if (parentInfo != null)
-                        {
-                            Console.WriteLine($"Added child process {args.Name}({args.Id}) to child {parentInfo.Name}({parentInfo.Id})");
-                        }
+                        Console.WriteLine("We're gone!");
+                        Environment.Exit(0);
                     }
                 };
-                test.OnStateChange += delegate (object sender, StateEventArgs args)
+
+                wardenTest.OnProcessAdded += delegate(object sender, ProcessAddedEventArgs args)
                 {
-                    Console.WriteLine($"---\nName: {test.Name}\nId: {test.Id}\nstate changed to {args.State}\n---");
+                  Console.WriteLine($"Added process {args.ProcessPath} to {args.ParentId}");
                 };
-                test.OnChildStateChange += delegate (object sender, StateEventArgs args)
+
+                wardenTest.OnChildStateChange += delegate(object sender, StateEventArgs args)
                 {
-                    var childInfo = test.FindChildById(args.Id);
+                    var childInfo = wardenTest.FindChildById(args.Id);
                     if (childInfo != null)
                     {
                         Console.WriteLine($"---\nName: {childInfo.Name}\nId: {childInfo.Id}\nParentId:{childInfo.ParentId}\nstated changed to {args.State}\n---");
                     }
-                };
-                Console.WriteLine($"Hooked into {test.Name}({test.Id})");
-                Console.Read();
-                Console.WriteLine(JsonConvert.SerializeObject(test, Formatting.Indented));
-                test.Kill();
-            }
-
-
-    */
-            Console.WriteLine("Start notepad");
-            var wardenTest = WardenProcess.StartUwp(new WardenStartInfo
-            {
-                PackageFamilyName = "Microsoft.Halo5Forge_8wekyb3d8bbwe",
-                ApplicationId = "Ausar"
-            });
-            if (wardenTest != null)
-            {
-                wardenTest.OnStateChange += delegate (object sender, StateEventArgs args)
-                {
-                    Console.WriteLine($"---\nName: {wardenTest.Name}\nId: {wardenTest.Id}\nstate changed to {args.State}\n---");
                 };
             }
             Console.ReadKey(true);
@@ -79,7 +72,7 @@ namespace WardenExample
      
         private static void WardenManagerOnOnUntrackedProcessAdded(object sender, UntrackedProcessEventArgs e)
         {
-            Console.WriteLine($"{e.ProcessPath} / {e.Id} / {e.Name} / {string.Join(" ", e.CommandLine?.ToArray() ?? new string[0])}");
+           Console.WriteLine($"{e.ProcessPath} / {e.Id} / {e.Name} / {string.Join(" ", e.CommandLine?.ToArray() ?? new string[0])}");
         }
     }
 }

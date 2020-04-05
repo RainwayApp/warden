@@ -1,5 +1,8 @@
-﻿namespace Warden.Windows
+﻿using System;
+
+namespace Warden.Windows
 {
+    [Flags]
     public enum ActivateOptionsEnum
     {
         None = 0,

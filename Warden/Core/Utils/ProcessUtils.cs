@@ -27,37 +27,6 @@ namespace Warden.Core.Utils
         [DllImport("Kernel32.dll")]
         static extern uint QueryFullProcessImageName(IntPtr hProcess, uint flags, StringBuilder text, out uint size);
 
-        public static bool IsWindowsApp(string path)
-        {
-            return path.Contains("WindowsApps");
-        }
-
-        public static IEnumerable<Process> GetChildProcesses(int id)
-        {
-            var processes = new List<Process>();
-            using (var mos = new ManagementObjectSearcher($"Select * From Win32_Process Where ParentProcessID={id}"))
-            {
-                using (var collection = mos.Get())
-                {
-                    foreach (var mo in collection)
-                    {
-                        using (mo)
-                        {
-                            try
-                            {
-                                processes.Add(Process.GetProcessById(Convert.ToInt32(mo["ProcessID"])));
-                            }
-                            catch
-                            {
-                               //
-                            }
-                        }
-                    }
-                }
-            }
-            return processes;
-        }
-
         public static List<string> GetCommandLineFromString(string arguments)
         {
             if (string.IsNullOrWhiteSpace(arguments))

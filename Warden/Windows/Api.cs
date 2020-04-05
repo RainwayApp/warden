@@ -3,12 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security;
-using System.Security.Principal;
-using System.Threading.Tasks;
 using Warden.Core;
-using Warden.Core.Exceptions;
-using Warden.Properties;
-using Warden.Windows.Uwp;
 
 namespace Warden.Windows
 {

@@ -1,11 +1,7 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 using Warden.Core;
 using Warden.Core.Exceptions;
-using Warden.Core.Utils;
 using Warden.Properties;
 
 namespace Warden.Windows.Win32
@@ -32,7 +28,7 @@ namespace Warden.Windows.Win32
                 {
                     throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
                 }
-                return WardenProcess.GetProcessFromId((int)procInfo.dwProcessId);
+                return WardenProcess.GetProcessFromId((int)procInfo.dwProcessId, startInfo.Filters);
             }
             var processStartInfo = new ProcessStartInfo
             {
@@ -47,7 +43,7 @@ namespace Warden.Windows.Win32
                 {
                     throw new WardenLaunchException(Resources.Exception_Process_Not_Launched_Unknown);
                 }
-                return WardenProcess.GetProcessFromId(process.Id);
+                return WardenProcess.GetProcessFromId(process.Id, startInfo.Filters);
             }
         }
     }

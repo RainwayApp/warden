@@ -1,14 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using Warden.Core;
 using Warden.Core.Exceptions;
-using Warden.Core.Models;
-using Warden.Core.Utils;
 using Warden.Properties;
 
 namespace Warden.Windows.Uwp
@@ -41,7 +34,7 @@ namespace Warden.Windows.Uwp
         /// <param name="aumid">The AUMID format is the package family name followed by an exclamation point and the application ID.</param>
         /// <param name="arguments"></param>
         /// <returns>when this method returns successfully, receives the process ID of the app instance that fulfills this contract.</returns>
-        private static int Launch(string aumid, string arguments) // No async because the method does not need await
+        private static int Launch(string aumid, string arguments) 
         {
             using (new WardenImpersonator())
             {
@@ -54,10 +47,6 @@ namespace Warden.Windows.Uwp
                 catch (Exception ex)
                 {
                     throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App, ex.Message), ex);
-                }
-                finally
-                {
-                    Marshal.ReleaseComObject(mgr);
                 }
             }
         }

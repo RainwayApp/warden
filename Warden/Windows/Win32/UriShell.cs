@@ -58,10 +58,10 @@ namespace Warden.Windows.Win32
         /// <returns></returns>
         public static bool LaunchUriDeferred(WardenStartInfo startInfo)
         {
-            var launcherInfo = ValidateUri(startInfo);
+            var (fileName, arguments, workingDirectory) = ValidateUri(startInfo);
             if (startInfo.AsUser)
             {
-                if (Api.StartProcessAndBypassUac(launcherInfo.FileName, launcherInfo.Arguments, launcherInfo.WorkingDirectory, out _))
+                if (Api.StartProcessAndBypassUac(fileName, arguments, workingDirectory, out _))
                 {
                     return true;
                 }
@@ -71,9 +71,9 @@ namespace Warden.Windows.Win32
 
             var processStartInfo = new ProcessStartInfo
             {
-                FileName = launcherInfo.FileName,
-                Arguments = launcherInfo.Arguments,
-                WorkingDirectory = launcherInfo.WorkingDirectory,
+                FileName = fileName,
+                Arguments = arguments,
+                WorkingDirectory = workingDirectory,
                 UseShellExecute = true
             };
 
@@ -95,22 +95,22 @@ namespace Warden.Windows.Win32
         /// <returns></returns>
         public static async Task<bool> LaunchUri(WardenStartInfo startInfo, CancellationTokenSource cancelToken)
         {
-            var launcherInfo = ValidateUri(startInfo);
+            var (fileName, arguments, workingDirectory) = ValidateUri(startInfo);
 
             if (startInfo.AsUser)
             {
-                if (!Api.StartProcessAndBypassUac(launcherInfo.FileName, launcherInfo.Arguments, launcherInfo.WorkingDirectory, out _))
+                if (!Api.StartProcessAndBypassUac(fileName, arguments, workingDirectory, out _))
                 {
-                    throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, launcherInfo.FileName, launcherInfo.Arguments));
+                    throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, fileName, arguments));
                 }
             }
             else
             {
                 var processStartInfo = new ProcessStartInfo
                 {
-                    FileName = launcherInfo.FileName,
-                    Arguments = launcherInfo.Arguments,
-                    WorkingDirectory = launcherInfo.WorkingDirectory,
+                    FileName = fileName,
+                    Arguments = arguments,
+                    WorkingDirectory = workingDirectory,
                     UseShellExecute = true
                 };
                 using (var process = Process.Start(processStartInfo))
