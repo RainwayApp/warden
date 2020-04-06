@@ -12,40 +12,20 @@ namespace Warden.Core.Utils
 {
     internal static class ProcessUtils
     {
+        private static readonly Random GetRandom = new Random();
+
+
+        public static int GenerateProcessId()
+        {
+            lock (GetRandom) // synchronize
+            {
+                return GetRandom.Next(1000000, 2000000);
+            }
+        }
+
 
         [DllImport("Kernel32.dll")]
         static extern uint QueryFullProcessImageName(IntPtr hProcess, uint flags, StringBuilder text, out uint size);
-
-        public static bool IsWindowsApp(string path)
-        {
-            return path.Contains("WindowsApps");
-        }
-
-        public static IEnumerable<Process> GetChildProcesses(int id)
-        {
-            var processes = new List<Process>();
-            using (var mos = new ManagementObjectSearcher($"Select * From Win32_Process Where ParentProcessID={id}"))
-            {
-                using (var collection = mos.Get())
-                {
-                    foreach (var mo in collection)
-                    {
-                        using (mo)
-                        {
-                            try
-                            {
-                                processes.Add(Process.GetProcessById(Convert.ToInt32(mo["ProcessID"])));
-                            }
-                            catch
-                            {
-                               //
-                            }
-                        }
-                    }
-                }
-            }
-            return processes;
-        }
 
         public static List<string> GetCommandLineFromString(string arguments)
         {
@@ -93,17 +73,6 @@ namespace Warden.Core.Utils
             }
         }
 
-        public static string NormalizePath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return path;
-            }
-            return Path.GetFullPath(new Uri(path).LocalPath)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                .ToUpperInvariant();
-        }
-
         public static string GetProcessPath(int processId)
         {
             var pathToExe = string.Empty;
@@ -117,7 +86,7 @@ namespace Warden.Core.Utils
                 if (0 != success)
                 {
                     pathToExe = buff.ToString();
-                    pathToExe = NormalizePath(buff.ToString());
+                    pathToExe = PathUtils.NormalizePath(buff.ToString());
                 }
             }
             catch

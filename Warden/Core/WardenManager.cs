@@ -68,7 +68,7 @@ namespace Warden.Core
         /// <param name="options"></param>
         public static void Initialize(WardenOptions options)
         {
-            if (!Api.IsAdmin())
+            if (!Privileges.IsUserAnAdministrator())
             {
                 throw new WardenManageException(Resources.Exception_No_Admin);
             }
@@ -262,7 +262,7 @@ namespace Warden.Core
                 ManagedProcesses[kvp.Key].Name = newProcesWithoutExt;
                 ManagedProcesses[kvp.Key].Path = processPath;
                 ManagedProcesses[kvp.Key].Arguments = commandLine;
-                ManagedProcesses[kvp.Key]?.FoundCallback?.BeginInvoke(true, null, null);
+                ManagedProcesses[kvp.Key]?.FoundCallback?.Invoke(true);
             });
         }
 
@@ -346,7 +346,7 @@ namespace Warden.Core
                     invoke(null, @event);
                     if(@event.Create)
                     {
-                        @event.Callback?.BeginInvoke(GetProcessFromId(processId, @event.Filters, processPath, commandLineArguments, false), null, null);
+                        @event.Callback?.Invoke(GetProcessFromId(processId, @event.Filters, processPath, commandLineArguments, false));
                     }
                 }
             }

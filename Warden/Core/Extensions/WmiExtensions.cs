@@ -3,7 +3,7 @@
     /// <summary>
     /// 
     /// </summary>
-    public static class WmiExtensions
+    internal static class WmiExtensions
     {
         /// <summary>
         /// 

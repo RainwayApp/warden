@@ -2,16 +2,18 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Core.Exceptions;
-using Warden.Core.Launchers;
 using Warden.Core.Models;
 using Warden.Core.Utils;
 using static Warden.Core.WardenManager;
 using Warden.Properties;
+using Warden.Windows.Uwp;
+using Warden.Windows.Win32;
 using static Warden.Core.Utils.ProcessUtils;
 
 namespace Warden.Core
@@ -77,8 +79,7 @@ namespace Warden.Core
 
         public delegate void ProcessAddedHandler(object sender, ProcessAddedEventArgs e);
 
-        internal WardenProcess(string name, int id, string path, ProcessState state, List<string> arguments,
-            ProcessTypes type, List<ProcessFilter> filters)
+        internal WardenProcess(string name, int id, string path, ProcessState state, List<string> arguments, List<ProcessFilter> filters)
         {
             Filters = filters;
             Name = name;
@@ -86,18 +87,10 @@ namespace Warden.Core
             Path = path;
             State = state;
             Arguments = arguments;
-            Type = type;
             Children = new ObservableCollection<WardenProcess>();
-            var epochTicks = new DateTime(1970, 1, 1).Ticks;
-            var unixTime = ((DateTime.UtcNow.Ticks - epochTicks) / TimeSpan.TicksPerSecond);
-            TimeStamp = unixTime;
         }
 
         [IgnoreDataMember] public readonly List<ProcessFilter> Filters;
-
-        public long TimeStamp { get; set; }
-
-        public ProcessTypes Type { get; }
 
         public ObservableCollection<WardenProcess> Children { get; internal set; }
 
@@ -165,7 +158,7 @@ namespace Warden.Core
 
         private void OnChildOnStateChange(object sender, StateEventArgs stateEventArgs)
         {
-            OnChildStateChange?.BeginInvoke(this, stateEventArgs, null, null);
+            OnChildStateChange?.Invoke(this, stateEventArgs);
         }
 
         /// <summary>
@@ -175,10 +168,10 @@ namespace Warden.Core
         internal void UpdateState(ProcessState state)
         {
             State = state;
-            OnStateChange?.BeginInvoke(this, new StateEventArgs(Id, State), null, null);
+            OnStateChange?.Invoke(this, new StateEventArgs(Id, State));
             if (ParentId > 0)
             {
-                OnChildStateChange?.BeginInvoke(this, new StateEventArgs(Id, State), null, null);
+                OnChildStateChange?.Invoke(this, new StateEventArgs(Id, State));
             }
         }
 
@@ -203,7 +196,7 @@ namespace Warden.Core
         /// <param name="args"></param>
         public void InvokeProcessAdd(ProcessAddedEventArgs args)
         {
-            OnProcessAdded?.BeginInvoke(this, args, null, null);
+            OnProcessAdded?.Invoke(this, args);
         }
 
         /// <summary>
@@ -256,6 +249,13 @@ namespace Warden.Core
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        internal static List<string> DefaultProcesses = new List<string>
+        {
+            "svchost", "runtimebroker", "backgroundtaskhost", "gamebarpresencewriter", "searchfilterhost"
+        };
 
         internal bool IsFiltered()
         {
@@ -263,11 +263,21 @@ namespace Warden.Core
             {
                 return false;
             }
-            return Filters.Any(filter =>
-                !string.IsNullOrWhiteSpace(filter.Name) &&
-                filter.Name.Equals(Name, StringComparison.CurrentCultureIgnoreCase) ||
-                !string.IsNullOrWhiteSpace(filter.Path) && NormalizePath(filter.Path)
-                    .Equals(Path, StringComparison.CurrentCultureIgnoreCase));
+            foreach (var defaultProcess in DefaultProcesses)
+            {
+                if (Path.ToLower().Contains(defaultProcess))
+                {
+                    return true;
+                }
+            }
+            foreach (var filter in Filters)
+            {
+                if (filter.Name.Equals(Name, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -315,27 +325,6 @@ namespace Warden.Core
             }
             return false;
         }
-
-        private void KillLegacy()
-        {
-            try
-            {
-                var process = Process.GetProcessById(Id);
-                if (process.HasExited)
-                {
-                    return;
-                }
-                //will likely be ignored by some apps
-                process.Kill();
-                //give it 5 seconds and move on
-                process.WaitForExit(TimeSpan.FromSeconds(5).Milliseconds);
-            }
-            catch
-            {
-                //
-            }
-        }
-
 
         private void TaskKill()
         {
@@ -395,169 +384,184 @@ namespace Warden.Core
         /// <returns></returns>
         private static bool CheckForWardenProcess(string path, out WardenProcess process)
         {
-            var runningProcess = GetProcess(path);
-            if (runningProcess == null)
+            using (var runningProcess = GetProcess(path))
             {
+                if (runningProcess == null)
+                {
+                    process = null;
+                    return false;
+                }
+
+                foreach (var key in ManagedProcesses.Keys)
+                {
+                    if (ManagedProcesses.TryGetValue(key, out process))
+                    {
+                        if (process.Id == runningProcess.Id)
+                        {
+                            return true;
+                        }
+                    }
+                }
                 process = null;
                 return false;
             }
-            //Lets check our watch list first
-            foreach (var managedProcess in ManagedProcesses)
+        }
+
+        /// <summary>
+        /// Launches a system URI and waits for the target process to appear.
+        /// </summary>
+        /// <param name="startInfo"></param>
+        /// <param name="cancelToken"></param>
+        /// <returns></returns>
+        public static async Task<WardenProcess> StartUri(WardenStartInfo startInfo, CancellationTokenSource cancelToken)
+        {
+            if (!Initialized)
             {
-                if (managedProcess.Value.Id != runningProcess.Id)
-                {
-                    continue;
-                }
-                process = ManagedProcesses[managedProcess.Key];
-                return true;
+                throw new WardenManageException(Resources.Exception_Not_Initialized);
             }
-            process = GetProcessFromId(runningProcess.Id);
-            return process != null;
+            if (string.IsNullOrWhiteSpace(startInfo.FileName))
+            {
+                throw new ArgumentException("fileName cannot be empty.");
+            }
+            if (string.IsNullOrWhiteSpace(startInfo.TargetFileName))
+            {
+                throw new ArgumentException("targetFileName cannot be empty.");
+            }
+            if (CheckForWardenProcess(startInfo.TargetFileName, out var existingProcess))
+            {
+                return existingProcess;
+            }
+            if (string.IsNullOrWhiteSpace(startInfo.Arguments))
+            {
+                startInfo.Arguments = string.Empty;
+            }
+            //lets add it to the dictionary ahead of time in case our program launches faster than we can return
+            var key = Guid.NewGuid();
+            if (ManagedProcesses.TryAdd(key, new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(startInfo.TargetFileName), GenerateProcessId(), startInfo.TargetFileName, ProcessState.Alive, startInfo.Arguments.SplitSpace(), startInfo.Filters)))
+            {
+                if (await UriShell.LaunchUri(startInfo, cancelToken))
+                {
+                    if (ManagedProcesses.TryGetValue(key, out var process))
+                    {
+                        return process;
+                    }
+                }
+            }
+            ManagedProcesses.TryRemove(key, out var failedProcess);
+            return null;
         }
 
         /// <summary>
         /// Launches a system URI and returns an empty Warden process set to Alive
-        /// If the process is found later via its path the process ID will be updated to match so children can be added.
-        /// </summary>
-        /// <param name="uri">The URI that will be launched</param>
-        /// <param name="path">The full path of the executable that should spawn after the URI launch.</param>
-        /// <param name="arguments">Any additional arguments.</param>
-        /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
-        /// <returns></returns>
-        public static async Task<WardenProcess> StartUri(string uri, string path, string arguments,
-            List<ProcessFilter> filters, CancellationToken cancelToken, bool asUser = false)
-        {
-            if (!Initialized)
-            {
-                throw new WardenManageException(Resources.Exception_Not_Initialized);
-            }
-            if (CheckForWardenProcess(path, out var existingProcess))
-            {
-                return existingProcess;
-            }
-            if (string.IsNullOrWhiteSpace(arguments))
-            {
-                arguments = string.Empty;
-            }
-            //lets add it to the dictionary ahead of time in case our program launches faster than we can return
-            var key = Guid.NewGuid();
-            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path),
-                new Random().Next(1000000, 2000000), path, ProcessState.Alive, arguments.SplitSpace(), ProcessTypes.Uri,
-                filters);
-            ManagedProcesses[key] = warden;
-            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken,key, asUser) != null)
-            {
-                return ManagedProcesses[key];
-            }
-            ManagedProcesses.TryRemove(key, out var t);
-            return null;
-        }
-
-        /// <summary>
-        /// Launches a system URI asynchronously and returns an empty Warden process set to Alive
         /// This spawns an asynchronous loop that will execute a callback if the target process is found
         /// However the function returns right away to ensure it does not block. 
         /// </summary>
-        /// <param name="uri">The URI that will be launched</param>
-        /// <param name="path">The full path of the executable that should spawn after the URI launch.</param>
-        /// <param name="arguments">Any additional arguments.</param>
-        /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
-        /// <param name="callback">A callback executed on if the process launched or not.</param>
-        /// <param name="cancelToken"></param>
+        /// <param name="startInfo"></param>
+        /// <param name="callback"></param>
         /// <returns></returns>
-        public static async Task<WardenProcess> StartUriAsync(string uri, string path, string arguments,
-            List<ProcessFilter> filters, Action<bool> callback, CancellationToken cancelToken, bool asUser = false, string workingDir = null)
+        public static WardenProcess StartUriDeferred(WardenStartInfo startInfo, Action<bool> callback)
         {
             if (!Initialized)
             {
                 throw new WardenManageException(Resources.Exception_Not_Initialized);
             }
-            if (CheckForWardenProcess(path, out var existingProcess))
+            if (string.IsNullOrWhiteSpace(startInfo.FileName))
+            {
+                throw new ArgumentException("fileName cannot be empty.");
+            }
+            if (string.IsNullOrWhiteSpace(startInfo.TargetFileName))
+            {
+                throw new ArgumentException("targetFileName cannot be empty.");
+            }
+            if (CheckForWardenProcess(startInfo.TargetFileName, out var existingProcess))
             {
                 return existingProcess;
             }
-            if (string.IsNullOrWhiteSpace(arguments))
+            if (string.IsNullOrWhiteSpace(startInfo.Arguments))
             {
-                arguments = string.Empty;
+                startInfo.Arguments = string.Empty;
             }
+
             //lets add it to the dictionary ahead of time in case our program launches faster than we can return
             var key = Guid.NewGuid();
-            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(path),
-                new Random().Next(1000000, 2000000), path, ProcessState.Alive, arguments?.SplitSpace(),
-                ProcessTypes.Uri, filters)
+            var warden = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(startInfo.TargetFileName),
+                GenerateProcessId(), startInfo.TargetFileName, ProcessState.Alive, startInfo.Arguments.SplitSpace(), startInfo.Filters)
             {
                 FoundCallback = callback
             };
-            ManagedProcesses[key] = warden;
-            if (await new UriLauncher().PrepareUri(uri, path, arguments, cancelToken, key, asUser, workingDir) != null)
+            if (ManagedProcesses.TryAdd(key, warden))
             {
-                return ManagedProcesses[key];
+                if (UriShell.LaunchUriDeferred(startInfo))
+                {
+                    if (ManagedProcesses.TryGetValue(key, out var process))
+                    {
+                        return process;
+                    }
+                }
             }
-            ManagedProcesses.TryRemove(key, out var t);
+            ManagedProcesses.TryRemove(key, out var failedProcess);
             return null;
         }
 
         /// <summary>
-        /// Starts a monitored UWP process using the applications family package name and token.
+        /// Starts a monitored UWP process using the applications family package name and app ID.
         /// </summary>
-        /// <param name="appId">The UWP family package name</param>
-        /// <param name="appToken">The token needed to launch the app within the package</param>
-        /// <param name="arguments">Any additional arguments.</param>
-        /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
+        /// <param name="startInfo"></param>
         /// <returns></returns>
-        public static async Task<WardenProcess> StartUwp(string appId, string appToken, string arguments,
-            List<ProcessFilter> filters)
+        public static WardenProcess StartUwp(WardenStartInfo startInfo)
         {
             if (!Initialized)
             {
                 throw new WardenManageException(Resources.Exception_Not_Initialized);
             }
-            if (string.IsNullOrWhiteSpace(arguments))
+            if (string.IsNullOrWhiteSpace(startInfo.PackageFamilyName))
             {
-                arguments = string.Empty;
+                throw new ArgumentException("packageFamilyName cannot be empty.");
             }
-            var process = await new UwpLauncher().Launch(appId, appToken, arguments);
-            if (process == null)
+            if (string.IsNullOrWhiteSpace(startInfo.ApplicationId))
             {
-                return null;
+                throw new ArgumentException("applicationId cannot be empty.");
             }
-            var key = Guid.NewGuid();
-            ManagedProcesses[key] = process;
-            return ManagedProcesses[key];
+            if (CheckForWardenProcess(startInfo.FileName, out var existingProcess))
+            {
+                return existingProcess;
+            }
+            if (string.IsNullOrWhiteSpace(startInfo.Arguments))
+            {
+                startInfo.Arguments = string.Empty;
+            }
+            return UwpShell.LaunchApp(startInfo);
         }
 
         /// <summary>
         /// Starts a monitored process using the applications full path.
         /// This method should only be used for win32 applications 
         /// </summary>
-        /// <param name="path">The full path of the executable</param>
-        /// <param name="arguments">>Any additional arguments.</param>
-        /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
-        /// <param name="asUser">Set to true if launching a program from a service.</param>
+        /// <param name="startInfo"></param>
         /// <returns></returns>
-        public static async Task<WardenProcess> Start(string path, string arguments, string workingDir = null, List<ProcessFilter> filters = null,
-            bool asUser = false)
+        public static WardenProcess Start(WardenStartInfo startInfo)
         {
             if (!Initialized)
             {
                 throw new WardenManageException(Resources.Exception_Not_Initialized);
             }
-            if (CheckForWardenProcess(path, out var existingProcess))
+            if (string.IsNullOrWhiteSpace(startInfo.FileName))
+            {
+                throw new ArgumentException("fileName cannot be empty.");
+            }
+            if (string.IsNullOrWhiteSpace(startInfo.WorkingDirectory))
+            {
+               startInfo.WorkingDirectory = PathUtils.GetDirectoryName(startInfo.FileName);
+            }
+            if (CheckForWardenProcess(startInfo.FileName, out var existingProcess))
             {
                 return existingProcess;
             }
-            if (string.IsNullOrWhiteSpace(arguments))
+            if (string.IsNullOrWhiteSpace(startInfo.Arguments))
             {
-                arguments = string.Empty;
+                startInfo.Arguments = string.Empty;
             }
-            var process = await new Win32Launcher().Launch(path, arguments, workingDir, asUser);
-            if (process == null)
-            {
-                return null;
-            }
-            var key = Guid.NewGuid();
-            ManagedProcesses[key] = process;
-            return ManagedProcesses[key];
+            return UserShell.LaunchWin32App(startInfo);
         }
 
 
@@ -601,8 +605,7 @@ namespace Warden.Core
         /// <param name="commandLine"></param>
         /// <param name="track"></param>
         /// <returns></returns>
-        public static WardenProcess GetProcessFromId(int pId, List<ProcessFilter> filters = null,
-            string processPath = null, List<string> commandLine = null, bool track = true)
+        public static WardenProcess GetProcessFromId(int pId, List<ProcessFilter> filters = null, string processPath = null, List<string> commandLine = null, bool track = true)
         {
             var process = BuildTreeById(pId, filters, processPath, commandLine);
             if (process == null)
@@ -611,8 +614,12 @@ namespace Warden.Core
             }
             if (!track) return process;
             var key = Guid.NewGuid();
-            ManagedProcesses[key] = process;
-            return ManagedProcesses[key];
+            if (ManagedProcesses.TryAdd(key, process))
+            { 
+                return process;
+            }
+            ManagedProcesses.TryRemove(key, out var _);
+            return null;
         }
 
 
@@ -629,19 +636,18 @@ namespace Warden.Core
                 {
                     process = Process.GetProcesses().FirstOrDefault(it => it.Id == pId);
                 }
+
+                if (process == null)
+                {
+                    return null;
+                }
                 var processName = process.ProcessName;
                 var processId = process.Id;
                 var path = processPath ?? GetProcessPath(processId);
                 var state = process.HasExited ? ProcessState.Dead : ProcessState.Alive;
                 var arguments = commandLine ?? GetCommandLine(processId);
-                var type = IsWindowsApp(path) ? ProcessTypes.Uwp : ProcessTypes.Win32;
-                var warden = new WardenProcess(processName, processId, path, state, arguments, type, filters);
-                var children = GetChildProcesses(pId);
-                foreach (var child in children)
-                {
-                    warden.AddChild(BuildTreeById(child.Id, filters, null, null));
-                }
-                return new WardenProcess(processName, processId, path, state, arguments, type, filters);
+                var warden = new WardenProcess(processName, processId, path, state, arguments, filters);
+                return warden;
             }
             catch (Exception ex)
             {
@@ -671,7 +677,7 @@ namespace Warden.Core
                 var processName = process.ProcessName;
                 var processId = process.Id;
                 var state = process.HasExited ? ProcessState.Dead : ProcessState.Alive;
-                warden = new WardenProcess(processName, processId, path, state, commandLineArguments, ProcessTypes.Win32, filters);
+                warden = new WardenProcess(processName, processId, path, state, commandLineArguments, filters);
                 warden.SetParent(parentId);
                 return warden;
             }
@@ -679,7 +685,7 @@ namespace Warden.Core
             {
                 //
             }
-            warden = new WardenProcess(name, id, path, ProcessState.Dead, commandLineArguments, ProcessTypes.Win32, filters);
+            warden = new WardenProcess(name, id, path, ProcessState.Dead, commandLineArguments, filters);
             warden.SetParent(parentId);
             return warden;
         }
