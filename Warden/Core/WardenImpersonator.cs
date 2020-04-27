@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Principal;
+using Warden.Core.Exceptions;
 
 namespace Warden.Core
 {
@@ -30,7 +31,7 @@ namespace Warden.Core
         }
 
         /// <summary>
-        /// 
+        /// Gets the currently impersonated users name
         /// </summary>
         /// <returns></returns>
         public string UserName()
@@ -81,29 +82,24 @@ namespace Warden.Core
             {
                 return null;
             }
-            if (OpenProcessToken(explorer, TOKEN_TOKEN_QUERY | TOKEN_TOKEN_IMPERSONATE | TOKEN_TOKEN_DUPLICATE, ref hToken) != 0)
+            try
             {
+                if (OpenProcessToken(explorer, TOKEN_TOKEN_QUERY | TOKEN_TOKEN_IMPERSONATE | TOKEN_TOKEN_DUPLICATE, ref hToken) == 0)
+                {
+                    throw new WardenException("Unable to open explorer process");
+                }
                 var newId = new WindowsIdentity(hToken);
-                try
+                const int securityImpersonation = 2;
+                var dupeTokenHandle = DupeToken(hToken, securityImpersonation);
+                if (IntPtr.Zero == dupeTokenHandle)
                 {
-                    const int securityImpersonation = 2;
-                    var dupeTokenHandle = DupeToken(hToken, securityImpersonation);
-                    if (IntPtr.Zero == dupeTokenHandle)
-                    {
-                        var s = $"Token duplication failed {Marshal.GetLastWin32Error()}, privilege not held";
-                        throw new Exception(s);
-                    }
-
-                    return newId;
+                    throw new WardenException($"Token duplication failed {Marshal.GetLastWin32Error()}, privilege not held");
                 }
-                finally
-                {
-                    CloseHandle(hToken);
-                }
+                return newId;
             }
+            finally
             {
-                var s = $"OpenProcess Failed {Marshal.GetLastWin32Error()}, privilege not held";
-                throw new Exception(s);
+                CloseHandle(hToken);
             }
         }
 
