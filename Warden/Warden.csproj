@@ -75,6 +75,7 @@
     <Compile Include="Windows\Uwp\IApplicationActivationManager.cs" />
     <Compile Include="Windows\Privileges.cs" />
     <Compile Include="Windows\Uwp\UwpShell.cs" />
+    <Compile Include="Windows\Win32\ShellStartInfo.cs" />
     <Compile Include="Windows\Win32\UserShell.cs" />
     <Compile Include="Windows\Win32\UriShell.cs" />
   </ItemGroup>

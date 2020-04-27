@@ -76,11 +76,15 @@ namespace Warden.Core
         public string ApplicationId { get; set; }
 
         /// <summary>
-        /// If this is set to true the application will be launched with full administrative privileges and bypass UAC prompts.
-        /// You will want to do this if you're running a SYSTEM service and need to launch software into the users desktop.
-        /// The default is false.
+        /// If this is set to true, the process will attempt to launch into an administrative context.
+        /// Using the shell this means appending "runas" where as with StartProcessAsUser it will use the security token of WinLogon
         /// </summary>
-        public bool AsUser { get; set; } = false;
+        public bool RaisePrivileges { get; set; } = false;
+
+        /// <summary>
+        /// If set to false the process is not tracked by Warden when calling any launch start method. 
+        /// </summary>
+        public bool Track { get; set; } = true;
 
         /// <summary>
         /// Process filters prevent certain child applications from polluting the process family tree.

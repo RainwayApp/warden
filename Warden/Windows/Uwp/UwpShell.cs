@@ -24,7 +24,7 @@ namespace Warden.Windows.Uwp
             {
                 throw new WardenLaunchException(string.Format(Resources.Exception_Could_Not_Find_Process_Id, aumid));
             }
-            return WardenProcess.GetProcessFromId(processId, startInfo.Filters);
+            return WardenProcess.GetProcessFromId(processId, startInfo.Filters, startInfo.Track);
         }
 
 
@@ -46,7 +46,8 @@ namespace Warden.Windows.Uwp
                 }
                 catch (Exception ex)
                 {
-                    throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App, ex.Message), ex);
+                    throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App,
+                        $"{ex.Message}\n {aumid} / {arguments}"), ex);
                 }
             }
         }

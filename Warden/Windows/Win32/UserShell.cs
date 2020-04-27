@@ -12,39 +12,29 @@ namespace Warden.Windows.Win32
     internal static class UserShell
     {
         /// <summary>
-        /// 
+        /// Attempts to create a process outside of session zero.
         /// </summary>
         /// <param name="startInfo"></param>
         /// <returns></returns>
-        internal static WardenProcess LaunchWin32App(WardenStartInfo startInfo)
+        internal static WardenProcess CreateProcessAsUser(WardenStartInfo startInfo)
         {
             if (!new FileInfo(startInfo.FileName).Exists)
             {
                 throw new WardenLaunchException($"Unable to launch {startInfo.FileName} -- the file is missing.");
             }
-            if (startInfo.AsUser)
+            if (startInfo.RaisePrivileges)
             {
-                if (!Api.StartProcessAndBypassUac(startInfo.FileName, startInfo.Arguments, startInfo.WorkingDirectory, out var procInfo))
+                if (Api.StartProcessAsPrivilegedUser(startInfo.FileName, startInfo.Arguments, startInfo.WorkingDirectory, out var privInfo))
                 {
-                    throw new WardenLaunchException(string.Format(Resources.Exception_Process_Not_Start, startInfo.FileName, startInfo.Arguments));
+                    return WardenProcess.GetProcessFromId(privInfo, startInfo.Filters, startInfo.Track);
                 }
-                return WardenProcess.GetProcessFromId((int)procInfo.dwProcessId, startInfo.Filters);
+                throw new WardenLaunchException("Unable to start process as privileged user");
             }
-            var processStartInfo = new ProcessStartInfo
+            if (Api.StartProcessAsUser(startInfo.FileName, startInfo.Arguments, startInfo.WorkingDirectory, out var procInfo))
             {
-                FileName = startInfo.FileName,
-                Arguments = startInfo.Arguments,
-                WorkingDirectory = startInfo.WorkingDirectory,
-                UseShellExecute = true
-            };
-            using (var process = Process.Start(processStartInfo))
-            {
-                if (process == null)
-                {
-                    throw new WardenLaunchException(Resources.Exception_Process_Not_Launched_Unknown);
-                }
-                return WardenProcess.GetProcessFromId(process.Id, startInfo.Filters);
+                return WardenProcess.GetProcessFromId(procInfo, startInfo.Filters, startInfo.Track);
             }
+            throw new WardenLaunchException("Unable to start process as user");
         }
     }
 }

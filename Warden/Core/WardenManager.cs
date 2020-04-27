@@ -346,7 +346,7 @@ namespace Warden.Core
                     invoke(null, @event);
                     if(@event.Create)
                     {
-                        @event.Callback?.Invoke(GetProcessFromId(processId, @event.Filters, processPath, commandLineArguments, false));
+                        @event.Callback?.Invoke(GetProcessFromId(processId, @event.Filters, false, processPath, commandLineArguments));
                     }
                 }
             }
