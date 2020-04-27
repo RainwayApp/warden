@@ -29,7 +29,7 @@ namespace WardenExample
 
            var cancel = new CancellationTokenSource();
            cancel.CancelAfter(TimeSpan.FromSeconds(10));
-           var wardenTest = WardenProcess.StartUriDeferred(new WardenStartInfo
+           var wardenTest = WardenProcess.StartUri(new WardenStartInfo
            {
                FileName = "steam://run/107410",
                TargetFileName = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Arma 3\\arma3launcher.exe"
