@@ -417,6 +417,10 @@ namespace Warden.Core
         /// <returns></returns>
         public static WardenProcess StartUri(WardenStartInfo startInfo, Action<bool> callback)
         {
+            if (!startInfo.ValidateUri)
+            {
+                return StartByShell(startInfo, callback);
+            }
             var (fileName, arguments, workingDirectory) = UriShell.ValidateUri(startInfo);
             var wardenInfo = new WardenStartInfo
             {

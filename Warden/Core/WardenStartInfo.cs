@@ -92,5 +92,10 @@ namespace Warden.Core
         /// </summary>
         public List<ProcessFilter> Filters { get; set; }
 
+        /// <summary>
+        /// If set to false Warden will not unwrap a URI to check for files before calling it.
+        /// </summary>
+        public bool ValidateUri { get; set; }
+
     }
 }
