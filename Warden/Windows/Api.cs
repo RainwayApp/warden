@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Security.Principal;
 using Warden.Core.Exceptions;
 using Warden.Windows.Win32;
 
@@ -127,6 +128,9 @@ namespace Warden.Windows
             }
         }
 
+       
+
+
         /// <summary>
         /// Gets the session handle for the currently active user
         /// </summary>
@@ -167,14 +171,15 @@ namespace Warden.Windows
             {
                 // Convert the impersonation token to a primary token
                 bResult = DuplicateTokenEx(hImpersonationToken, 0, IntPtr.Zero,
-                    (int)SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, (int)TOKEN_TYPE.TokenPrimary,
+                    (int)SECURITY_IMPERSONATION_LEVEL.SecurityImpersonation, (int)TokenType.Primary,
                     ref phUserToken);
 
-                CloseHandle(hImpersonationToken);
             }
-
+            CloseHandle(pSessionInfo);
+            CloseHandle(hImpersonationToken);
             return bResult;
         }
+
 
         /// <summary>
         /// Finds the WinLogon process ID for the active session
@@ -196,6 +201,54 @@ namespace Warden.Windows
                 }
             }
             return 0;
+        }
+
+        /// <summary>
+        /// Returns the current session user identity 
+        /// </summary>
+        /// <returns></returns>
+        internal static WindowsIdentity GetSessionUserIdentity()
+        {
+            var hImpersonationToken = IntPtr.Zero;
+            var pSessionInfo = IntPtr.Zero;
+            try
+            {
+                var activeSessionId = INVALID_SESSION_ID;
+     
+             
+                var sessionCount = 0;
+                if (WTSEnumerateSessions(WTS_CURRENT_SERVER_HANDLE, 0, 1, ref pSessionInfo, ref sessionCount) != 0)
+                {
+                    var arrayElementSize = Marshal.SizeOf(typeof(WTS_SESSION_INFO));
+                    var current = pSessionInfo;
+
+                    for (var i = 0; i < sessionCount; i++)
+                    {
+                        var si = (WTS_SESSION_INFO)Marshal.PtrToStructure(current, typeof(WTS_SESSION_INFO));
+                        current += arrayElementSize;
+
+                        if (si.State == WTS_CONNECTSTATE_CLASS.WTSActive)
+                        {
+                            activeSessionId = si.SessionID;
+                        }
+                    }
+                }
+                // Enumeration might not workout, so we use our old friend.
+                if (activeSessionId == INVALID_SESSION_ID)
+                {
+                    activeSessionId = WTSGetActiveConsoleSessionId();
+                }
+                if (WTSQueryUserToken(activeSessionId, ref hImpersonationToken) != 0)
+                {
+                    return new WindowsIdentity(hImpersonationToken);
+                }
+                throw new WardenLaunchException("GetSessionUserToken failed.");
+            }
+            finally
+            {
+                CloseHandle(pSessionInfo);
+                CloseHandle(hImpersonationToken);
+            }
         }
 
         /// <summary>
@@ -335,7 +388,7 @@ namespace Warden.Windows
                 sa.Length = Marshal.SizeOf(sa);
 
                 // copy the access token of the explorer process; the newly created token will be a primary token
-                if (!DuplicateTokenEx(hPToken, MAXIMUM_ALLOWED, ref sa, (int)SECURITY_IMPERSONATION_LEVEL.SecurityIdentification, (int)TOKEN_TYPE.TokenPrimary, ref explorerToken))
+                if (!DuplicateTokenEx(hPToken, MAXIMUM_ALLOWED, ref sa, (int)SECURITY_IMPERSONATION_LEVEL.SecurityIdentification, (int)TokenType.Primary, ref explorerToken))
                 {
                     throw new WardenLaunchException("Unable to duplicate security token");
                 }
@@ -402,7 +455,7 @@ namespace Warden.Windows
             string lpCurrentDirectory, ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
 
         [DllImport("advapi32.dll", EntryPoint = "DuplicateTokenEx")]
-        private static extern bool DuplicateTokenEx(
+        internal static extern bool DuplicateTokenEx(
             IntPtr ExistingTokenHandle,
             uint dwDesiredAccess,
             IntPtr lpThreadAttributes,
@@ -417,20 +470,20 @@ namespace Warden.Windows
 
 
         [DllImport("kernel32.dll")]
-        private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
+        internal static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
 
         [DllImport("advapi32", SetLastError = true), SuppressUnmanagedCodeSecurity]
-        private static extern bool OpenProcessToken(IntPtr ProcessHandle, int DesiredAccess, ref IntPtr TokenHandle);
+        internal static extern bool OpenProcessToken(IntPtr ProcessHandle, int DesiredAccess, ref IntPtr TokenHandle);
 
         [DllImport("userenv.dll", SetLastError = true)]
-        private static extern bool CreateEnvironmentBlock(ref IntPtr lpEnvironment, IntPtr hToken, bool bInherit);
+        internal static extern bool CreateEnvironmentBlock(ref IntPtr lpEnvironment, IntPtr hToken, bool bInherit);
 
         [DllImport("userenv.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool DestroyEnvironmentBlock(IntPtr lpEnvironment);
+        internal static extern bool DestroyEnvironmentBlock(IntPtr lpEnvironment);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(IntPtr hSnapshot);
+        internal static extern bool CloseHandle(IntPtr hSnapshot);
 
         [DllImport("kernel32.dll")]
         private static extern uint WTSGetActiveConsoleSessionId();
@@ -468,6 +521,9 @@ namespace Warden.Windows
                 CtrlLogoffEvent = 5,
                 CtrlShutdownEvent
             }
+
+
+
 
         private const int CREATE_UNICODE_ENVIRONMENT = 0x00000400;
         private const int CREATE_NO_WINDOW = 0x08000000;
@@ -575,10 +631,10 @@ namespace Warden.Windows
             public IntPtr hStdError;
         }
 
-        private enum TOKEN_TYPE
+        private enum TokenType
         {
-            TokenPrimary = 1,
-            TokenImpersonation = 2
+            Primary = 1,
+            Impersonation = 2
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -620,7 +676,9 @@ namespace Warden.Windows
                 [MarshalAs(UnmanagedType.IUnknown)] out object shellView
             );
         }
-
+        [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern bool DuplicateToken(IntPtr existingTokenHandle,
+            int securityImpersonationLevel, ref IntPtr duplicateTokenHandle);
         [ComImport]
         [Guid("000214E3-0000-0000-C000-000000000046")]
         [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

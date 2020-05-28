@@ -72,7 +72,7 @@ namespace Warden.Core
             {
                 throw new WardenManageException(Resources.Exception_No_Admin);
             }
-
+            WardenImpersonator.Initialize();
             Stop();
             Options = options ?? throw new WardenManageException(Resources.Exception_No_Options);
             try

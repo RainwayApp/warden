@@ -34,22 +34,22 @@ namespace Warden.Windows.Uwp
         /// <param name="aumid">The AUMID format is the package family name followed by an exclamation point and the application ID.</param>
         /// <param name="arguments"></param>
         /// <returns>when this method returns successfully, receives the process ID of the app instance that fulfills this contract.</returns>
-        private static int Launch(string aumid, string arguments) 
+        private static int Launch(string aumid, string arguments)
         {
-            using (new WardenImpersonator())
+            return WardenImpersonator.RunAsUser(delegate
             {
                 var mgr = new ApplicationActivationManager();
                 try
                 {
                     mgr.ActivateApplication(aumid, arguments, ActivateOptionsEnum.None, out var processId);
-                    return (int) processId;
+                    return (int)processId;
                 }
                 catch (Exception ex)
                 {
                     throw new WardenLaunchException(string.Format(Resources.Exception_Error_Trying_To_Launch_App,
                         $"{ex.Message}\n {aumid} / {arguments}"), ex);
                 }
-            }
+            });
         }
     }
 }

@@ -338,6 +338,7 @@ namespace Warden.Core
                     Options.DeepKill ? TaskSwitch.TerminateChildren : null
                 }
             };
+           
             taskKill.Execute(out var output, out var error);
             if (!string.IsNullOrWhiteSpace(output))
             {
@@ -356,7 +357,7 @@ namespace Warden.Core
         {
             try
             {
-                if (Options.KillWhitelist?.Any(x => Name.StartsWith(x, StringComparison.InvariantCultureIgnoreCase)) == false)
+                if (Filters?.Any(x => Name.StartsWith(x.Name, StringComparison.InvariantCultureIgnoreCase)) == false)
                 {
                     TaskKill();
                 }

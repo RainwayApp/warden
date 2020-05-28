@@ -1,120 +1,122 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Security;
+using System.Security.Permissions;
 using System.Security.Principal;
 using Warden.Core.Exceptions;
+using Warden.Windows;
+using Warden.Windows.Win32;
 
 namespace Warden.Core
 {
     /// <summary>
     /// Impersonates the currently logged in and active user and runs programs under their context
     /// </summary>
-    public class WardenImpersonator : IDisposable
+    [PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
+    public static class WardenImpersonator
     {
-        private readonly WindowsImpersonationContext _context;
-        private readonly WindowsIdentity _identity;
+        private static bool _needsImpersonation;
+        private static WindowsIdentity _identity;
 
         /// <summary>
-        /// 
+        /// Initializes the static impersonation context by fetching the token for the active user session.
         /// </summary>
-        public IntPtr Token => _identity.Token;
-
-        /// <summary>
-        /// 
-        /// </summary>
-        public WardenImpersonator()
+        internal static void Initialize()
         {
-            _identity = GetIdentity();
-            _context = _identity.Impersonate();
+            _needsImpersonation = WindowsIdentity.GetCurrent().IsSystem;
+            if (_needsImpersonation)
+            {
+                _identity = Api.GetSessionUserIdentity();
+            }
         }
 
         /// <summary>
-        /// Gets the currently impersonated users name
+        /// Determines if the current session requires impersonation.
+        /// If the entry process is not running under SYSTEM this is false.
+        /// </summary>
+        /// <returns>whether impersonation should be used.</returns>
+        public static bool NeedsImpersonation()
+        {
+            return _needsImpersonation;
+        }
+
+        /// <summary>
+        /// Gets the username of the active user session
         /// </summary>
         /// <returns></returns>
-        public string UserName()
+        public static string Username()
         {
-            return WindowsIdentity.GetCurrent().Name;
+            if (_needsImpersonation)
+            {
+                return WindowsIdentity.GetCurrent().Name;
+            }
+            if (_identity == null)
+            {
+                throw new WardenException($"The Windows Identity is null.");
+            }
+            return _identity.Name;
         }
 
-        [DllImport("advapi32", SetLastError = true), SuppressUnmanagedCodeSecurity]
-        private static extern int OpenProcessToken(IntPtr processHandle, int desiredAccess, ref IntPtr tokenHandle);
 
-        [DllImport("kernel32", SetLastError = true)]
-        [SuppressUnmanagedCodeSecurity]
-        private static extern bool CloseHandle(IntPtr handle);
-
-        [DllImport("advapi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern bool DuplicateToken(IntPtr existingTokenHandle,
-            int securityImpersonationLevel, ref IntPtr duplicateTokenHandle);
-
-        private const int TOKEN_TOKEN_DUPLICATE = 2;
-        private const int TOKEN_TOKEN_QUERY = 0X00000008;
-        private const int TOKEN_TOKEN_IMPERSONATE = 0X00000004;
-
-
-        private IntPtr GetExplorerHandle()
+        /// <summary>
+        /// Execute a function under the context of the active user session.
+        /// </summary>
+        /// <typeparam name="T">The return type of the function.</typeparam>
+        /// <param name="function">The function to execute.</param>
+        /// <returns>The result of executing the function.</returns>
+        public static T RunAsUser<T>(Func<T> function)
         {
-            foreach (var p in Process.GetProcesses())
+            if (!_needsImpersonation)
             {
-                try
-                {
-                    if (!p.ProcessName.Equals("explorer")) continue;
-                    var handle = p.Handle;
-                    return handle;
-                }
-                catch
-                {
-                    // Ignore forbidden processes so we can get a list of processes we do have access to
-                }
-            } 
-            return IntPtr.Zero;
+                return function();
+            }
+            if (_identity == null)
+            {
+                throw new WardenException($"The Windows Identity is null.");
+            }
+            return RunImpersonated(function);
         }
 
-        private WindowsIdentity GetIdentity()
+        /// <summary>
+        /// Perform an action under the context of the active user session.
+        /// </summary>
+        /// <param name="action">The action to perform.</param>
+        public static void RunAsUser(Action action)
         {
-            var hToken = IntPtr.Zero;
-            var explorer = GetExplorerHandle();
+            if (!_needsImpersonation)
+            {
+                action();
+                return;
+            }
+            if (_identity == null)
+            {
+                throw new WardenException($"The Windows Identity is null.");
+            }
+            RunImpersonated(action);
+        }
 
-            if (explorer == IntPtr.Zero)
+        /// <summary>
+        /// Establishes a impersonation context and performs an action under it
+        /// </summary>
+        /// <param name="action">the action to perform.</param>
+        private static void RunImpersonated(Action action)
+        {
+            using (var context = _identity.Impersonate())
             {
-                return null;
-            }
-            try
-            {
-                if (OpenProcessToken(explorer, TOKEN_TOKEN_QUERY | TOKEN_TOKEN_IMPERSONATE | TOKEN_TOKEN_DUPLICATE, ref hToken) == 0)
-                {
-                    throw new WardenException("Unable to open explorer process");
-                }
-                var newId = new WindowsIdentity(hToken);
-                const int securityImpersonation = 2;
-                var dupeTokenHandle = DupeToken(hToken, securityImpersonation);
-                if (IntPtr.Zero == dupeTokenHandle)
-                {
-                    throw new WardenException($"Token duplication failed {Marshal.GetLastWin32Error()}, privilege not held");
-                }
-                return newId;
-            }
-            finally
-            {
-                CloseHandle(hToken);
+                action();
             }
         }
 
-        private static IntPtr DupeToken(IntPtr token, int level)
+        /// <summary>
+        /// Establishes a impersonation context and executes a function under it, returning results.
+        /// </summary>
+        /// <typeparam name="T">the return type of the function</typeparam>
+        /// <param name="function">the function to execute</param>
+        /// <returns></returns>
+        private static T RunImpersonated<T>(Func<T> function)
         {
-            var dupeTokenHandle = IntPtr.Zero;
-            DuplicateToken(token, level, ref dupeTokenHandle);
-            return dupeTokenHandle;
-        }
-
-        public void Dispose()
-        {
-            _context?.Undo();
-            _context?.Dispose();
-            _identity?.Dispose();
+            using (var context = _identity.Impersonate())
+            {
+                return function();
+            }
         }
     }
 }
