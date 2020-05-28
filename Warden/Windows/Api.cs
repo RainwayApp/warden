@@ -204,6 +204,28 @@ namespace Warden.Windows
         }
 
         /// <summary>
+        /// Finds the WinLogon process ID for the active session
+        /// </summary>
+        /// <param name="sessionId"></param>
+        /// <returns></returns>
+        private static int GetExplorerId(ref uint sessionId)
+        {
+            foreach (var p in Process.GetProcessesByName("explorer"))
+            {
+                try
+                {
+                    if (p.SessionId != sessionId) continue;
+                    return p.Id;
+                }
+                catch
+                {
+                    // Ignore forbidden processes so we can get a list of processes we do have access to
+                }
+            }
+            return 0;
+        }
+
+        /// <summary>
         /// Returns the current session user identity 
         /// </summary>
         /// <returns></returns>
@@ -340,7 +362,7 @@ namespace Warden.Windows
             var startInfo = new STARTUPINFO();
             var procInfo = new PROCESS_INFORMATION();
             var pEnv = IntPtr.Zero;
-            IntPtr explorerToken = IntPtr.Zero, hPToken = IntPtr.Zero, hProcess = IntPtr.Zero;
+            IntPtr winLogonToken = IntPtr.Zero, hPToken = IntPtr.Zero, hProcess = IntPtr.Zero;
             startInfo.cb = Marshal.SizeOf(typeof(STARTUPINFO));
             try
             {
@@ -364,18 +386,18 @@ namespace Warden.Windows
                     throw new WardenLaunchException("CreateEnvironmentBlock failed.");
                 }
 
-                var explorerId = GetWinLogonId(ref activeSessionId);
-                if (explorerId == 0)
+                var winLogonId = GetWinLogonId(ref activeSessionId);
+                if (winLogonId == 0)
                 {
-                    throw new WardenLaunchException("Finding Explorer process ID failed.");
+                    throw new WardenLaunchException("Finding WinLogon process ID failed.");
                 }
 
                 // obtain a handle to the winlogon process
-                hProcess = OpenProcess(MAXIMUM_ALLOWED, false, (uint) explorerId);
+                hProcess = OpenProcess(MAXIMUM_ALLOWED, false, (uint) winLogonId);
                 // obtain a handle to the access token of the winlogon process
                 if (!OpenProcessToken(hProcess, TOKEN_ALL_ACCESS, ref hPToken))
                 {
-                    throw new WardenLaunchException("failed to open explorer process token.");
+                    throw new WardenLaunchException("failed to open WinLogon process token.");
                 }
 
 
@@ -387,14 +409,16 @@ namespace Warden.Windows
                 var sa = new SECURITY_ATTRIBUTES();
                 sa.Length = Marshal.SizeOf(sa);
 
+      
                 // copy the access token of the explorer process; the newly created token will be a primary token
-                if (!DuplicateTokenEx(hPToken, MAXIMUM_ALLOWED, ref sa, (int)SECURITY_IMPERSONATION_LEVEL.SecurityIdentification, (int)TokenType.Primary, ref explorerToken))
+                if (!DuplicateTokenEx(hPToken, MAXIMUM_ALLOWED, ref sa, (int)SECURITY_IMPERSONATION_LEVEL.SecurityIdentification, (int)TokenType.Primary, ref winLogonToken))
                 {
                     throw new WardenLaunchException("Unable to duplicate security token");
                 }
 
+                var d = IntPtr.Zero;
                 // create a new process in the current user's logon session
-                if (!CreateProcessAsUser(explorerToken,
+                if (!CreateProcessAsUser(winLogonToken,
                     appPath, // file to execute
                     arguments,  // command line
                     ref sa, // pointer to process SECURITY_ATTRIBUTES
@@ -418,7 +442,7 @@ namespace Warden.Windows
                 CloseHandle(hProcess);
                 CloseHandle(hPToken);
                 CloseHandle(hUserToken);
-                CloseHandle(explorerToken);
+                CloseHandle(winLogonToken);
                 if (pEnv != IntPtr.Zero)
                 {
                     DestroyEnvironmentBlock(pEnv);
