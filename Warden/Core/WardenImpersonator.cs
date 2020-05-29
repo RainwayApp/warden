@@ -44,7 +44,7 @@ namespace Warden.Core
         /// <returns></returns>
         public static string Username()
         {
-            if (_needsImpersonation)
+            if (!_needsImpersonation)
             {
                 return WindowsIdentity.GetCurrent().Name;
             }
