@@ -1,4 +1,4 @@
-﻿# Warden.NET
+# Warden.NET
 
 ## What Is It?
 
@@ -6,13 +6,16 @@ Warden.NET is a simple to use library for managing processes and their states.
 
 ## Why?
 
-With [Rainway](https://rainway.io) we're tasked with launching thousands of different applications from various third parties. To ensure launching games was a smooth process for the user, we needed a reliable way to keep track of game states. 
+With [Rainway](https://rainway.com/) we're tasked with launching thousands of different applications from various third parties. To ensure launching games was a smooth process for the user, we needed a reliable way to keep track of game states. 
 
-The ```System.Diagnostics.Process``` class while useful does not have a concept for parent applications; while Windows itself does track parents, it does not track grandparents and processes can quickly become orphaned. Which is where Warden comes in.  
+The ```System.Diagnostics.Process``` class, while useful, does not have a concept for parent applications; In contrast, Windows itself tracks parents; however, it does not track grandparents, and processes can quickly become orphaned. ```Process.EnableRaisingEvents``` while useful, does not support monitoring URI-based launches' lifetime, processes with higher privileges than the calling application, or processes different sessions.
 
-
+That is why we built Warden.NET.
 
 ## Getting Started
+
+
+_As of Warden.NET 6.0.0 the calling application is no longer required to be running as Administrator. Some processes may be inaccessible however without those privileges._
 
 ### Installing
 
@@ -22,62 +25,35 @@ Via Nuget
 Install-Package Warden.NET
 ```
 
-### Initializing Warden 
-To initialize Warden inside your application, call the static initialization function. (Pass ```true``` if you'd like Warden to kill all monitored processes on exit.)
+
+### Enable Process Tracking
+
+To initialize Warden to track processes you launch through it you must first call `SystemProcessMonitor.Start(new MonitorOptions());` in the entry point of your application.
+
+If you wish you can optionally subscribe to receive events when all untracked processes have started and stopped execution.  
 
 ```csharp
-  WardenManager.Initialize(new WardenOptions
-  {
-                CleanOnExit = true,
-                DeepKill = true,
-                ReadFileHeaders = true
-  });
+SystemProcessMonitor.OnProcessStarted += (sender, info) => Console.WriteLine(info);
+SystemProcessMonitor.OnProcessStopped += (sender, info) => Console.WriteLine(info);
 ```
 
 ### Launching a Process
 
-Warden processes are launched asynchronously and return null if it fails to launch.
+The `WardenProcess` class allows you to start processes on the current machine in various context. It supports:
 
-If you wish to launch a Win32 application just call the following code. 
+- Using the operating system shell to start the process.
+- Creating a process as the current interactive user.
+- Launching a Microsoft Store / Universal Windows Platform app.
 
-```csharp
-var process = await WardenProcess.Start("G:/Games/steamapps/common/NieRAutomata/NieRAutomata.exe", string.empty, null);
-```
-
-Similarly, you can launch a UWP like so.
-
-```csharp
- var process = await  WardenProcess.StartUwp("Microsoft.Halo5Forge_8wekyb3d8bbwe", "!Ausar", string.Empty, null);
-```
-
-If you need to start a URI, that is also supported. 
-
-Pass the URI you wish to run, as well as the full path to the executable that should appear afterwards. This method will return an "empty" Warden object. The ```Id``` of the object will update automatically when the target process launches.
+All of these methods support exit events and process family tree tracking. For more information please review the in-line documentation. 
 
 
-```csharp
- var test = await WardenProcess.StartUriAsync("steam://run/107410", "G:/Games/steamapps/common/Arma 3/arma3launcher.exe", string.Empty, null, callback, token);
-```
+### Impersonation 
 
-Or you can synchronously wait for a URI to start 
+Warden supplies a built-in class, `WardenImpersonator`, that helps processes created by `WardenProcess.StartAsUser` execute code as the interactive user. 
 
-```csharp
- var test =  await WardenProcess.StartUri("steam://run/107410", "G:/Games/steamapps/common/Arma 3/arma3launcher.exe", string.Empty, null, token);
-```
-
-
-Finally, you can build a Warden process tree from an already running process like so
-
-```
- WardenProcess.GetProcessFromId(999);
-```
-
-### Listening to Process States
-
-You can subscribe to ```OnProcessAdded``` to know when a process has been added to the tree, the ```OnStateChange``` event to know when a process state has updated. Additionally you can subscribe to ```OnChildStateChange``` to know when its children have had a change in state.
 
 
 ## Notes
 
 If you'd like to contribute we'll be happy to accept pull request. You can find a full example application in the repository.
-
