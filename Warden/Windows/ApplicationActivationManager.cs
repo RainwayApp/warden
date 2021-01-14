@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Warden.Windows.Uwp
+namespace Warden.Windows
 {
     /// <summary>
     /// Provides methods which activate Windows Store apps for the Launch, File, and Protocol extensions. You would normally use this interface in debuggers and design tools.

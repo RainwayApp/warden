@@ -1,93 +1,23 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{69BD1AC4-362A-41D0-8E84-A76064D90B4B}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Warden</RootNamespace>
-    <AssemblyName>Warden</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
+    <TargetFrameworks>netcoreapp3.1;net472;net5.0</TargetFrameworks>
+    <LangVersion>9</LangVersion>
+    <Nullable>Enable</Nullable>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <DocumentationFile>bin\Debug\Warden.xml</DocumentationFile>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|netcoreapp3.1|x64'">
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <DocumentationFile>bin\Release\Warden.xml</DocumentationFile>
+
+  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|netcoreapp3.1|x64'">
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Management" />
-    <Reference Include="System.Runtime.Serialization" />
+    <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
+    <PackageReference Include="System.Security.Principal.Windows" Version="5.0.0" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Core\DummyWardenLogger.cs" />
-    <Compile Include="Core\Exceptions\WardenExceptionStrings.cs" />
-    <Compile Include="Core\Exceptions\WardenException.cs" />
-    <Compile Include="Core\Exceptions\WardenManageException.cs" />
-    <Compile Include="Core\Exceptions\WardenLaunchException.cs" />
-    <Compile Include="Core\Extensions\WmiExtensions.cs" />
-    <Compile Include="Core\Models\ProcessFilter.cs" />
-    <Compile Include="Core\Utils\PathUtils.cs" />
-    <Compile Include="Core\Utils\ProcessUtils.cs" />
-    <Compile Include="Core\Utils\ShutdownUtils.cs" />
-    <Compile Include="Core\Utils\StringUtils.cs" />
-    <Compile Include="Core\Utils\TaskKill.cs" />
-    <Compile Include="Core\WardenImpersonator.cs" />
-    <Compile Include="Core\IWardenLogger.cs" />
-    <Compile Include="Core\WardenLogger.cs" />
-    <Compile Include="Core\WardenManager.cs" />
-    <Compile Include="Core\WardenProcess.cs" />
-    <Compile Include="Core\WardenEnums.cs" />
-    <Compile Include="Core\WardenStartInfo.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-    <Compile Include="Windows\Uwp\ActivateOptions.cs" />
-    <Compile Include="Windows\Api.cs" />
-    <Compile Include="Windows\Uwp\ApplicationActivationManager.cs" />
-    <Compile Include="Windows\Uwp\IApplicationActivationManager.cs" />
-    <Compile Include="Windows\Privileges.cs" />
-    <Compile Include="Windows\Uwp\UwpShell.cs" />
-    <Compile Include="Windows\Win32\ShellStartInfo.cs" />
-    <Compile Include="Windows\Win32\UserShell.cs" />
-    <Compile Include="Windows\Win32\UriShell.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include=".editorconfig" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
 </Project>

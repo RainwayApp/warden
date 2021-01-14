@@ -1,681 +1,628 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.Globalization;
+using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
-using System.Threading;
-using System.Threading.Tasks;
-using Warden.Core.Exceptions;
-using Warden.Core.Models;
-using Warden.Core.Utils;
-using static Warden.Core.WardenManager;
-using Warden.Properties;
+using System.Security.Principal;
+using Warden.Monitor;
+using Warden.Utils;
 using Warden.Windows;
-using Warden.Windows.Uwp;
-using Warden.Windows.Win32;
-using static Warden.Core.Utils.ProcessUtils;
 
 namespace Warden.Core
 {
-    public class StateEventArgs : EventArgs
-    {
-        public StateEventArgs(int processId, ProcessState state)
-        {
-            State = state;
-            Id = processId;
-        }
-
-        public ProcessState State { get; }
-
-        public int Id { get; }
-    }
-
-    public class ProcessAddedEventArgs : EventArgs
-    {
-        public ProcessAddedEventArgs(string name, int parentId, int processId, string processPath, List<string> commandLine)
-        {
-            Name = name;
-            ParentId = parentId;
-            Id = processId;
-            ProcessPath = processPath;
-            CommandLine = commandLine;
-        }
-
-        public ProcessAddedEventArgs()
-        {
-        }
-
-        public string Name { get; internal set; }
-
-        public int ParentId { get; internal set; }
-
-        public int Id { get; internal set; }
-
-        public string ProcessPath { get; internal set; }
-
-        public List<string> CommandLine { get; internal set; }
-    }
-
-
-    public class UntrackedProcessEventArgs : ProcessAddedEventArgs
-    {
-        public UntrackedProcessEventArgs(string name, int parentId, int processId, string processPath, List<string> commandLine) : base(name, parentId, processId, processPath, commandLine) { }
-        public UntrackedProcessEventArgs() : base() { }
-
-        public bool Create { get; set; } = false;
-        public List<ProcessFilter> Filters { get; set; } = null;
-        public Action<WardenProcess> Callback { get; set; } = null;
-    }
-
     /// <summary>
-    /// Provides access to local processes and their children in real-time.
+    ///     Encapsulates a system process object for tracking and reliable lifetime management.
     /// </summary>
-    public class WardenProcess
+    public sealed class WardenProcess : IDisposable
     {
-        public delegate void ChildStateUpdateHandler(object sender, StateEventArgs e);
-
-        public delegate void StateUpdateHandler(object sender, StateEventArgs e);
-
-        public delegate void ProcessAddedHandler(object sender, ProcessAddedEventArgs e);
-
-        internal WardenProcess(string name, int id, string path, ProcessState state, List<string> arguments, List<ProcessFilter> filters)
+        /// <summary>
+        ///     Initialize a new <see cref="WardenProcess"/> instance that is associated with the specified process
+        ///     <paramref name="info"/>.
+        /// </summary>
+        /// <param name="info">The process information of a system process object.</param>
+        /// <param name="filteredImages"></param>
+        internal WardenProcess(ProcessInfo? info, IEnumerable<string>? filteredImages = null) : this(filteredImages)
         {
-            Filters = filters;
-            Name = name;
-            Id = id;
-            Path = path;
-            State = state;
-            Arguments = arguments;
-            Children = new ObservableCollection<WardenProcess>();
+            if (info is null)
+            {
+                throw new ArgumentNullException(nameof(info));
+            }
+            Initialize(info);
         }
 
-        [IgnoreDataMember] public readonly List<ProcessFilter> Filters;
-
-        public ObservableCollection<WardenProcess> Children { get; internal set; }
-
-        public int ParentId { get; internal set; }
-
-        public int Id { get; internal set; }
-
-        public ProcessState State { get; private set; }
-
-        public string Path { get; internal set; }
-
-        public string Name { get; internal set; }
-
-        [IgnoreDataMember]
-        public Action<bool> FoundCallback { get; set; }
-
-        public List<string> Arguments { get; internal set; }
-
-        internal static string DefaultWardenReferProcUac = "winlogon";
 
         /// <summary>
-        /// Used to set the target process which LaunchAsUser will steal a session token from. Default is "winlogon".
-        /// If your target process is gone, this will default back to winlogon.
+        ///     Creates a new <see cref="WardenProcess"/> instance that will be initialized asynchronously.
         /// </summary>
-        public static string WardenReferProcUac { get; set; } = DefaultWardenReferProcUac;
-
-        internal void SetParent(int parentId)
+        /// <param name="info">The system process monitor information that will assist future process association.</param>
+        /// <param name="filteredImages"></param>
+        internal WardenProcess(MonitorInfo info, IEnumerable<string>? filteredImages = null) : this(filteredImages)
         {
-            if (parentId == Id)
+            Monitor = info ?? throw new ArgumentNullException(nameof(info));
+        }
+
+
+        private WardenProcess(IEnumerable<string>? filteredImages)
+        {
+            if (filteredImages is not null)
+            {
+                FilteredImageNames = new HashSet<string>(filteredImages, StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        ///     Information used by <see cref="SystemProcessMonitor"/> to help associate a new process launch with this
+        ///     <see cref="WardenProcess"/> instance if it is being tracked.
+        /// </summary>
+        internal MonitorInfo? Monitor { get; private set; }
+
+        /// <summary>
+        ///     Gets the value that was specified by the associated process when it was terminated.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown when trying to retrieve the exit code before the process has exited.</exception>
+        /// <exception cref="SystemException">
+        ///     Thrown when no process ID has been set, and a Handle from which the ID property can
+        ///     be determined does not exist.
+        /// </exception>
+        public int ExitCode
+        {
+            get
+            {
+                if (_isCurrentProcess)
+                {
+                    return 0;
+                }
+                if (!HasExited)
+                {
+                    throw new InvalidOperationException("The process has not exited.");
+                }
+                if (_watcher is not null)
+                {
+                    return _watcher.ExitCode;
+                }
+                throw new SystemException("There is no system process associated with this WardenProcess object.");
+            }
+        }
+
+
+        /// <summary>
+        ///     Indicates whether the current process has been terminated.
+        /// </summary>
+        /// <exception cref="SystemException">
+        ///     Thrown when no process ID has been set, and a Handle from which the ID property can
+        ///     be determined does not exist.
+        /// </exception>
+        public bool HasExited
+        {
+            get
+            {
+                if (_isCurrentProcess)
+                {
+                    return false;
+                }
+                if (_watcher is not null)
+                {
+                    return _watcher.HasExited;
+                }
+                throw new SystemException("There is no system process associated with this WardenProcess object.");
+            }
+        }
+
+        /// <summary>
+        ///     Indicates if the current process and all of its children have stopped executing.
+        /// </summary>
+        /// <exception cref="SystemException">
+        ///     Thrown when no process ID has been set on the current or a child process, and a Handle from which the ID property
+        ///     can
+        ///     be determined does not exist.
+        /// </exception>
+        public bool HasTreeExited
+        {
+            get
+            {
+                if (_isCurrentProcess)
+                {
+                    return false;
+                }
+                // We don't need to check all the children if the parent is still alive.
+                if (!HasExited)
+                {
+                    return false;
+                }
+                // Now that the current process has exited lets check the children.
+                // IF there are zero children the tree has fully exited.
+                if (Children is null)
+                {
+                    return true;
+                }
+                //  Recursively check child processes until we reach the end of the process family tree.
+                return Children.Count == 0 || Children.Any(c => c.HasTreeExited is false);
+            }
+        }
+
+        /// <summary>
+        ///     A collection of process image names (executables) that will not be added as children to this
+        ///     <see cref="WardenProcess"/> even if the underlying system process object is the parent.
+        /// </summary>
+        public HashSet<string>? FilteredImageNames { get; }
+
+        /// <summary>
+        ///     Information about the current process such as its name and working directory.
+        /// </summary>
+        public ProcessInfo? Info { get; private set; }
+
+        /// <summary>
+        ///     A collection of child processes that were spawned by the current process.
+        /// </summary>
+        public List<WardenProcess>? Children { get; private set; }
+
+
+        /// <summary>
+        ///     indicates if the current <see cref="WardenProcess"/> has been disposed.
+        /// </summary>
+        private bool _disposed;
+
+        /// <summary>
+        ///     A delegate for <see cref="OnChildExit"/>
+        /// </summary>
+        private EventHandler<int>? _onChildExit;
+
+        /// <summary>
+        ///     A delegate for <see cref="OnExit"/>
+        /// </summary>
+        private EventHandler<int>? _onExit;
+
+
+        /// <summary>
+        ///     A delegate for <see cref="OnFound"/>
+        /// </summary>
+        private EventHandler<WardenProcess>? _onFound;
+
+        /// <summary>
+        ///     A watcher that listens for the underlying system process to exit.
+        /// </summary>
+        private ProcessHook? _watcher;
+        /// <summary>
+        /// When set to true this field indicates that the current <see cref="WardenProcess"/> is associated with the currently active process.
+        /// </summary>
+        private bool _isCurrentProcess;
+
+
+        /// <summary>
+        ///     Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+        /// </summary>
+        public void Dispose()
+        {
+            // Dispose of unmanaged resources.
+            Dispose(true);
+            // Suppress finalization.
+            GC.SuppressFinalize(this);
+        }
+
+
+        /// <summary>
+        ///     A destructor for the current <see cref="WardenProcess"/>.
+        /// </summary>
+        ~WardenProcess()
+        {
+            Dispose(false);
+        }
+
+
+        /// <summary>
+        ///     Disposes the current <see cref="WardenProcess"/> and all of its child processes.
+        /// </summary>
+        /// <param name="disposeManaged">Indicates if dispose was called by the finalizer or not.</param>
+        private void Dispose(bool disposeManaged)
+        {
+            // the warden process has been disposed so there is nothing left to do.
+            if (_disposed)
             {
                 return;
             }
-            ParentId = parentId;
+            if (disposeManaged)
+            {
+                _watcher?.Dispose();
+                if (_onFound is not null)
+                {
+                    foreach (var d in _onFound.GetInvocationList())
+                    {
+                        _onFound -= d as EventHandler<WardenProcess>;
+                    }
+                    _onFound = null;
+                }
+                if (_onExit is not null)
+                {
+                    foreach (var d in _onExit.GetInvocationList())
+                    {
+                        _onExit -= d as EventHandler<int>;
+                    }
+                    _onExit = null;
+                }
+                if (_onChildExit is not null)
+                {
+                    foreach (var d in _onChildExit.GetInvocationList())
+                    {
+                        _onChildExit -= d as EventHandler<int>;
+                    }
+                    _onChildExit = null;
+                }
+                if (Children is not null)
+                {
+                    foreach (var child in Children)
+                    {
+                        child.Dispose();
+                    }
+                }
+                if (Info is not null)
+                {
+                    //  SystemProcessMonitor.Flush(Info.Id);
+                }
+            }
+            _disposed = true;
         }
 
         /// <summary>
-        /// Finds a child process by its id
+        ///     An event that is fired when the current <see cref="WardenProcess"/> has been associated with a system process after
+        ///     requesting an asynchronous launch.
         /// </summary>
-        /// <param name="id"></param>
-        /// <returns>The WardenProcess of the child.</returns>
-        public WardenProcess FindChildById(int id)
+        internal event EventHandler<WardenProcess> OnFound
         {
-            return FindChildById(id, Children);
+            add => _onFound += value;
+            remove => _onFound -= value;
         }
 
         /// <summary>
-        /// Adds a child to a collection.
+        ///     An event that is fired when a child process of the current <see cref="WardenProcess"/> exits.
         /// </summary>
-        /// <param name="child"></param>
-        /// <returns></returns>
-        internal bool AddChild(WardenProcess child)
+        public event EventHandler<int> OnChildExit
         {
-            if (child == null)
+            add => _onChildExit += value;
+            remove => _onChildExit -= value;
+        }
+
+        /// <summary>
+        ///     An event that is fired when the current <see cref="WardenProcess"/> exits.
+        /// </summary>
+        public event EventHandler<int> OnExit
+        {
+            add => _onExit += value;
+            remove => _onExit -= value;
+        }
+
+        /// <summary>
+        ///     Adds the specified <paramref name="child"/> process to the current processes <see cref="Children"/> collection.
+        /// </summary>
+        /// <param name="child">The child process that will be added.</param>
+        /// <exception cref="NullReferenceException">
+        ///     Thrown when trying to add a child process to the <see cref="Children"/>
+        ///     collection while its null.
+        /// </exception>
+        /// <exception cref="ArgumentNullException">Thrown when the specified <paramref name="child"/> argument is null</exception>
+        /// <exception cref="ObjectDisposedException">
+        ///     Thrown when trying to add a child process after the
+        ///     <see cref="WardenProcess"/> instance was disposed.
+        /// </exception>
+        internal void AddChild(WardenProcess child)
+        {
+            if (_disposed)
             {
-                return false;
+                throw new ObjectDisposedException("The WardenProcess has been disposed");
             }
-            if (Children == null)
+            if (child is null)
             {
-                Children = new ObservableCollection<WardenProcess>();
+                throw new ArgumentNullException(nameof(child));
             }
-            child.OnChildStateChange += OnChildOnStateChange;
+            if (Children is null)
+            {
+                throw new NullReferenceException(nameof(Children));
+            }
+            child.OnExit += OnChildProcessExitHandler;
             Children.Add(child);
-            return true;
         }
 
-        private void OnChildOnStateChange(object sender, StateEventArgs stateEventArgs)
-        {
-            OnChildStateChange?.Invoke(this, stateEventArgs);
-        }
 
         /// <summary>
-        /// Updates the state of a process and fires events.
+        ///     A event handler that is raised when a child process of the current <see cref="WardenProcess"/> exits.
         /// </summary>
-        /// <param name="state"></param>
-        internal void UpdateState(ProcessState state)
+        private void OnChildProcessExitHandler(object? sender, int e)
         {
-            State = state;
-            OnStateChange?.Invoke(this, new StateEventArgs(Id, State));
-            if (ParentId > 0)
+            if (_onChildExit is not null && sender is WardenProcess child)
             {
-                OnChildStateChange?.Invoke(this, new StateEventArgs(Id, State));
+                var exitCode = child.ExitCode;
+                _onChildExit(child, exitCode);
             }
         }
 
-        /// <summary>
-        /// This event is fired when the process state has changed.
-        /// </summary>
-        public event StateUpdateHandler OnStateChange;
 
         /// <summary>
-        /// This event is fired when a child for the current process has a state change.
+        ///     Initializes the current <see cref="WardenProcess"/> object and associates it with the specified process
+        ///     <paramref name="info"/>.
         /// </summary>
-        public event ChildStateUpdateHandler OnChildStateChange;
-
-        /// <summary>
-        /// This event is fired when a process is added to the main process or its children
-        /// </summary>
-        public event ProcessAddedHandler OnProcessAdded;
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="args"></param>
-        public void InvokeProcessAdd(ProcessAddedEventArgs args)
+        /// <param name="info">The process information the current <see cref="WardenProcess"/> object will be tied to.</param>
+        /// <exception cref="UnauthorizedAccessException">
+        ///     Thrown when the AppDomain lacks the necessary elevation to obtain a
+        ///     handle on the target process.
+        /// </exception>
+        internal void Initialize(ProcessInfo info)
         {
-            OnProcessAdded?.Invoke(this, args);
+            // set to null so the system process monitor skips further matching attempts.
+            Monitor = null;
+            Info = info;
+            Children = new List<WardenProcess>();
+            if (ProcessNative.CurrentProcessId == info.Id)
+            {
+                _isCurrentProcess = true;
+                return;
+            }
+            _watcher = new ProcessHook(info.Id);
+            _watcher.Exited += OnWatcherExit;
+            _watcher.Start();
         }
 
         /// <summary>
-        /// Crawls a process tree and updates the states.
+        ///     A event handler that is raised when the underlying system process object exits.
         /// </summary>
-        public void RefreshTree()
+        private void OnWatcherExit(object? sender, EventArgs e)
         {
-            try
+            if (_onExit is not null && _watcher is {HasExited: true})
             {
-                var p = Process.GetProcessById(Id);
-                p.Refresh();
-                State = p.HasExited ? ProcessState.Dead : ProcessState.Alive;
-            }
-            catch
-            {
-                State = ProcessState.Dead;
-            }
-            if (Children != null)
-            {
-                RefreshChildren(Children);
+                var exitCode = _watcher.ExitCode;
+                _onExit(this, exitCode);
+                Dispose();
             }
         }
 
         /// <summary>
-        /// Updates the children of a process.
+        ///     Attempts to find a child process of the current <see cref="WardenProcess"/> that belongs to the specified
+        ///     <paramref name="id"/>.
         /// </summary>
-        /// <param name="children"></param>
-        private void RefreshChildren(ObservableCollection<WardenProcess> children)
+        /// <param name="id">The system-unique identifier of the process.</param>
+        /// <returns>If the child is found its <see cref="WardenProcess"/> is returned. Otherwise this function returns null.</returns>
+        internal WardenProcess? FindChildProcess(int id)
         {
-            foreach (var child in children)
+            if (Children is null)
             {
-                if (child == null)
+                return null;
+            }
+            foreach (var child in Children)
+            {
+                if (child is {Info: not null})
                 {
-                    continue;
-                }
-                try
-                {
-                    var p = Process.GetProcessById(child.Id);
-                    p.Refresh();
-                    child.State = p.HasExited ? ProcessState.Dead : ProcessState.Alive;
-                }
-                catch
-                {
-                    child.State = ProcessState.Dead;
-                }
-                if (child.Children != null)
-                {
-                    RefreshChildren(child.Children);
+                    if (child.Info.Id == id)
+                    {
+                        return child;
+                    }
+                    if (child.Children is null)
+                    {
+                        continue;
+                    }
+                    if (child.FindChildProcess(id) is { } extendedChild)
+                    {
+                        return extendedChild;
+                    }
                 }
             }
+            return null;
         }
 
         /// <summary>
-        /// 
+        ///     Raises the event indicating that the current <see cref="WardenProcess"/> is now initialized with known process
+        ///     information.
         /// </summary>
-        internal static List<string> DefaultProcesses = new List<string>
+        internal void RaiseOnFound()
         {
-            "svchost", "runtimebroker", "backgroundtaskhost", "gamebarpresencewriter", "searchfilterhost"
-        };
-
-        internal bool IsFiltered()
-        {
-            if (Filters == null || Filters.Count <= 0)
-            {
-                return false;
-            }
-            foreach (var defaultProcess in DefaultProcesses)
-            {
-                if (Path.ToLower().Contains(defaultProcess))
-                {
-                    return true;
-                }
-            }
-            foreach (var filter in Filters)
-            {
-                if (filter.Name.Equals(Name, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    return true;
-                }
-            }
-            return false;
+            _onFound?.Invoke(null, this);
         }
 
         /// <summary>
-        /// Checks if the tree contains any applications that are alive.
+        ///     Sends a termination signal to the underlying system process object.
         /// </summary>
-        /// <returns></returns>
-        public bool IsTreeActive()
+        /// <param name="entireProcessTree">
+        ///     If set to true the termination signal will be sent to all processes descendant from the
+        ///     current <see cref="WardenProcess"/>.
+        /// </param>
+        /// <param name="exitCode">An optional exit code to be used by the process and threads terminated as a result of this call. </param>
+        /// <exception cref="NullReferenceException">
+        ///     Thrown when the current <see cref="WardenProcess"/> has a null
+        ///     <see cref="Info"/> property.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        ///     Thrown when trying to kill a <see cref="WardenProcess"/> that has already
+        ///     been disposed.
+        /// </exception>
+        public void Terminate(bool entireProcessTree, int exitCode = 0)
         {
-            if (State == ProcessState.Alive)
+            if (_disposed)
             {
-                return true;
+                throw new ObjectDisposedException("The process has been disposed.");
             }
-            return Children != null && CheckChildren(Children);
-        }
-
-        /// <summary>
-        /// Checks if any of the children are alive.
-        /// </summary>
-        /// <param name="children"></param>
-        /// <returns></returns>
-        private bool CheckChildren(ObservableCollection<WardenProcess> children)
-        {
-            if (children == null)
+            if (Info is null)
             {
-                return false;
+                throw new NullReferenceException(nameof(Info));
             }
-            foreach (var child in children)
+            ProcessNative.TerminateProcess(Info.Id, exitCode);
+            if (entireProcessTree && Children is not null)
             {
-                if (child == null)
-                {
-                    continue;
-                }
-                if (child.State == ProcessState.Alive)
-                {
-                    return true;
-                }
-                if (child.Children == null)
-                {
-                    continue;
-                }
-                if (CheckChildren(child.Children))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private void TaskKill()
-        {
-            var taskKill = new TaskKill
-            {
-                Arguments = new List<TaskSwitch>
-                {
-                    TaskSwitch.Force,
-                    TaskSwitch.ProcessId.SetValue(Id.ToString()),
-                    Options.DeepKill ? TaskSwitch.TerminateChildren : null
-                }
-            };
-           
-            taskKill.Execute(out var output, out var error);
-            if (!string.IsNullOrWhiteSpace(output))
-            {
-                Debug.WriteLine(output?.Trim());
-            }
-            if (!string.IsNullOrWhiteSpace(error))
-            {
-                Debug.WriteLine(error?.Trim());
-            }
-        }
-
-        /// <summary>
-        /// Kills the process and its children
-        /// </summary>
-        public void Kill()
-        {
-            try
-            {
-                if (Filters?.Any(x => Name.StartsWith(x.Name, StringComparison.InvariantCultureIgnoreCase)) == false)
-                {
-                    TaskKill();
-                }
-                if (Children == null || Children.Count <= 0 || !Options.DeepKill)
-                {
-                    return;
-                }
                 foreach (var child in Children)
                 {
-                    child?.Kill();
+                    child.Terminate(entireProcessTree, exitCode);
                 }
             }
-            catch
-            {
-                //
-            }
         }
 
-        #region static class
+
+    #region Factory Methods
 
         /// <summary>
-        /// Checks if a process is currently running, if so we build the WardenProcess right away or fetch a monitored one.
+        ///     <para>
+        ///         Starts the process resource that is specified by the start <paramref name="info"/> (for
+        ///         example, the file name of the process to start) as the current interactive user.
+        ///     </para>
         /// </summary>
-        /// <param name="path"></param>
-        /// <param name="process"></param>
-        /// <returns></returns>
-        private static bool CheckForWardenProcess(string path, out WardenProcess process)
+        /// <param name="info">
+        ///     The <see cref="WardenStartInfo"/> that contains the information that is used to start the process,
+        ///     including the file name and any command-line arguments.
+        /// </param>
+        /// <returns>A new  <see cref="WardenProcess"/> that is associated with the created process resource.</returns>
+        /// <remarks>
+        ///     The calling application must be running within the context of the LocalSystem account or this will throw.
+        /// </remarks>
+        public static WardenProcess? StartAsUser(WardenStartInfo info)
         {
-            using (var runningProcess = GetProcess(path))
+            if (!WindowsIdentity.GetCurrent().IsSystem)
             {
-                if (runningProcess == null)
-                {
-                    process = null;
-                    return false;
-                }
-
-                foreach (var key in ManagedProcesses.Keys)
-                {
-                    if (ManagedProcesses.TryGetValue(key, out process))
-                    {
-                        if (process.Id == runningProcess.Id)
-                        {
-                            return true;
-                        }
-                    }
-                }
-                process = null;
-                return false;
+                throw new UnauthorizedAccessException(" The calling application must be running within the context of the LocalSystem account");
             }
-        }
-
-        /// <summary>
-        /// Launches an application URI via the Windows shell. Internally this method unwraps the URI
-        /// and validates that it exist on the system. 
-        /// </summary>
-        /// <param name="startInfo"></param>
-        /// <param name="callback"></param>
-        /// <returns></returns>
-        public static WardenProcess StartUri(WardenStartInfo startInfo, Action<bool> callback)
-        {
-            if (!startInfo.ValidateUri)
+            if (string.IsNullOrWhiteSpace(info.FileName))
             {
-                return StartByShell(startInfo, callback);
+                throw new ArgumentException(nameof(info.FileName));
             }
-            var (fileName, arguments, workingDirectory) = UriShell.ValidateUri(startInfo);
-            var wardenInfo = new WardenStartInfo
+            if (info.Track && string.IsNullOrWhiteSpace(info.TargetImage))
             {
-                FileName = fileName,
-                Arguments = arguments,
-                WorkingDirectory = workingDirectory,
-                TargetFileName = startInfo.TargetFileName,
-                RaisePrivileges = startInfo.RaisePrivileges,
-                Filters = startInfo.Filters,
-                Track = startInfo.Track
-            };
-            return StartByShell(wardenInfo, callback);
-        }
-
-        /// <summary>
-        /// Starts a monitored UWP process using the applications family package name and app ID.
-        /// </summary>
-        /// <param name="startInfo"></param>
-        /// <returns></returns>
-        public static WardenProcess StartUwp(WardenStartInfo startInfo)
-        {
-            if (!Initialized)
-            {
-                throw new WardenManageException(Resources.Exception_Not_Initialized);
+                throw new ArgumentException(nameof(info.TargetImage));
             }
-            if (string.IsNullOrWhiteSpace(startInfo.PackageFamilyName))
+            if (info.Track && !SystemProcessMonitor.Running)
             {
-                throw new ArgumentException("packageFamilyName cannot be empty.");
+                throw new InvalidOperationException("Cannot track process because the System Process Monitor is not running.");
             }
-            //can be empty in some games
-            if (string.IsNullOrWhiteSpace(startInfo.ApplicationId))
+            if (string.IsNullOrWhiteSpace(info.WorkingDirectory) && Path.GetDirectoryName(info.FileName) is { } workingDirectory)
             {
-                startInfo.ApplicationId = string.Empty;
+                info.WorkingDirectory = workingDirectory;
             }
-            if (CheckForWardenProcess(startInfo.FileName, out var existingProcess))
-            {
-                return existingProcess;
-            }
-            if (string.IsNullOrWhiteSpace(startInfo.Arguments))
-            {
-                startInfo.Arguments = string.Empty;
-            }
-            return UwpShell.LaunchApp(startInfo);
-        }
-
-        /// <summary>
-        /// Starts a process or URI via the Windows shell.
-        /// </summary>
-        /// <param name="startInfo"></param>
-        /// <param name="callback"></param>
-        /// <returns></returns>
-        public static WardenProcess StartByShell(WardenStartInfo startInfo, Action<bool> callback = null)
-        {
-            if (!Initialized)
-            {
-                throw new WardenManageException(Resources.Exception_Not_Initialized);
-            }
-            if (string.IsNullOrWhiteSpace(startInfo.FileName))
-            {
-                throw new ArgumentException("fileName cannot be empty.");
-            }
-            if (startInfo.Track && string.IsNullOrWhiteSpace(startInfo.TargetFileName))
-            {
-                throw new ArgumentException("targetFileName cannot be empty.");
-            }
-            if (CheckForWardenProcess(startInfo.TargetFileName, out var existingProcess))
-            {
-                return existingProcess;
-            }
-            if (string.IsNullOrWhiteSpace(startInfo.Arguments))
-            {
-                startInfo.Arguments = string.Empty;
-            }
-
-            var shellStartInfo = new ShellStartInfo(startInfo.FileName, startInfo.Arguments, startInfo.WorkingDirectory)
-            {
-                Verb = startInfo.RaisePrivileges ? "runas" : "open"
-            };
-            if (startInfo.Track)
-            {
-                var key = Guid.NewGuid();
-                var proc = new WardenProcess(System.IO.Path.GetFileNameWithoutExtension(startInfo.TargetFileName), GenerateProcessId(), startInfo.TargetFileName, ProcessState.Alive, startInfo.Arguments.SplitSpace(), startInfo.Filters)
-                {
-                    FoundCallback = callback
-                };
-                if (ManagedProcesses.TryAdd(key, proc))
-                {
-                    Api.StartByShell(shellStartInfo);
-                    if (ManagedProcesses.TryGetValue(key, out var process))
-                    {
-                        return process;
-                    }
-                }
-            }
-            Api.StartByShell(shellStartInfo);
-            return null;
-        }
-
-        /// <summary>
-        /// Starts a process that breaks out of session zero isolation and into the current active user session.
-        /// </summary>
-        /// <param name="startInfo"></param>
-        /// <returns></returns>
-        public static WardenProcess StartProcessAsUser(WardenStartInfo startInfo)
-        {
-            if (!Initialized)
-            {
-                throw new WardenManageException(Resources.Exception_Not_Initialized);
-            }
-            if (string.IsNullOrWhiteSpace(startInfo.FileName))
-            {
-                throw new ArgumentException("fileName cannot be empty.");
-            }
-            if (string.IsNullOrWhiteSpace(startInfo.WorkingDirectory))
-            {
-               startInfo.WorkingDirectory = PathUtils.GetDirectoryName(startInfo.FileName);
-            }
-            if (CheckForWardenProcess(startInfo.FileName, out var existingProcess))
-            {
-                return existingProcess;
-            }
-            if (string.IsNullOrWhiteSpace(startInfo.Arguments))
-            {
-                startInfo.Arguments = string.Empty;
-            }
-            return UserShell.CreateProcessAsUser(startInfo);
+            return info.RaisePrivileges ? InteractiveProcessCreator.AsLocalSystem(info) : InteractiveProcessCreator.AsUser(info);
         }
 
 
         /// <summary>
-        /// Finds a process in the tree using recursion
+        ///     <para>
+        ///         Starts the process resource that is specified by the start <paramref name="info"/> (for
+        ///         example, the file name of the process to start) using the operating system shell to start the process.
+        ///     </para>
+        ///     <para>
+        ///         If tracking is disabled no process will ever be associated with this start call
+        ///         even if it succeeds, so this function will return null.
+        ///     </para>
+        ///     <para>
+        ///         If tracking is enabled this function will returned an orphaned <see cref="WardenProcess"/>.
+        ///         It will be automatically associated with a system process object that matches the specified target image once
+        ///         it begins executing.
+        ///     </para>
         /// </summary>
-        /// <param name="id"></param>
-        /// <param name="children"></param>
-        /// <returns></returns>
-        internal static WardenProcess FindChildById(int id, ObservableCollection<WardenProcess> children)
+        /// <param name="info">
+        ///     The <see cref="WardenStartInfo"/> that contains the information that is used to start the process,
+        ///     including the file name and any command-line arguments.
+        /// </param>
+        /// <param name="onFoundHandler">
+        ///     If tracking is enabled an optional event handler can be supplied that is raised once the
+        ///     <see cref="WardenProcess"/> has been associated with a system process object.
+        /// </param>
+        /// <returns>A new orphaned <see cref="WardenProcess"/>, or null if no tracking was enabled.</returns>
+        public static WardenProcess? Start(WardenStartInfo info, EventHandler<WardenProcess>? onFoundHandler = null)
         {
-            if (children == null)
+            if (info is null)
             {
-                return null;
+                throw new ArgumentException(nameof(info));
             }
-            foreach (var child in children)
+            if (string.IsNullOrWhiteSpace(info.FileName))
             {
-                if (child.Id == id)
-                {
-                    return child;
-                }
-                if (child.Children == null)
-                {
-                    continue;
-                }
-                var nested = FindChildById(id, child.Children);
-                if (nested != null)
-                {
-                    return nested;
-                }
+                throw new ArgumentException(nameof(info.FileName));
             }
-            return null;
+            if (info.Track && string.IsNullOrWhiteSpace(info.TargetImage))
+            {
+                throw new ArgumentException(nameof(info.TargetImage));
+            }
+            if (info.Track && !SystemProcessMonitor.Running)
+            {
+                throw new InvalidOperationException("Cannot track process because the System Process Monitor is not running.");
+            }
+            if (info.FileName.IsValidUri() && !UriHelpers.IsValidCustomProtocol(info.FileName))
+            {
+                throw new InvalidOperationException($"No file or protocol association could be found for '{info.FileName}'");
+            }
+            // If WorkingDirectory is an empty string, the current directory is understood to contain the executable.
+            if (string.IsNullOrWhiteSpace(info.WorkingDirectory))
+            {
+                info.WorkingDirectory = Environment.CurrentDirectory;
+            }
+            WardenProcess? process = null;
+            if (info.Track)
+            {
+                process = new WardenProcess(new MonitorInfo(info.TargetImage), info.FilteredImages);
+                if (onFoundHandler is not null)
+                {
+                    process.OnFound += onFoundHandler;
+                }
+                SystemProcessMonitor.TrackProcessFamily(process);
+            }
+            ShellExecute.Start(info);
+            return process;
         }
 
         /// <summary>
-        /// Attempts to create a Warden process tree from an existing system process.
+        ///     Launches a Microsoft Store / Universal Windows Platform app.
         /// </summary>
-        /// <param name="pId"></param>
-        /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
-        /// <param name="processPath"></param>
-        /// <param name="commandLine"></param>
-        /// <param name="track"></param>
-        /// <returns></returns>
-        public static WardenProcess GetProcessFromId(int pId, List<ProcessFilter> filters = null, bool track = true, string processPath = null, List<string> commandLine = null)
+        /// <param name="info">
+        ///     The <see cref="WardenStartInfo"/> that contains the information that is used to start the process,
+        ///     including the PackageFamilyName, ApplicationId, and any command-line arguments.
+        /// </param>
+        /// <returns>A <see cref="WardenProcess"/> instance that is associated with the activated application.</returns>
+        public static WardenProcess? StartUniversalApp(WardenStartInfo info)
         {
-            var process = BuildTreeById(pId, filters, processPath, commandLine);
-            if (process == null)
+            if (info is null)
             {
-                return null;
+                throw new ArgumentException(nameof(info));
             }
-            if (!track) return process;
-            var key = Guid.NewGuid();
-            if (ManagedProcesses.TryAdd(key, process))
-            { 
+            if (string.IsNullOrWhiteSpace(info.PackageFamilyName))
+            {
+                throw new ArgumentException(nameof(info.PackageFamilyName));
+            }
+            // some Microsoft Store apps have an empty application ID.
+            if (string.IsNullOrWhiteSpace(info.ApplicationId))
+            {
+                info.ApplicationId = string.Empty;
+            }
+            var aumid = $"{info.PackageFamilyName}!{info.ApplicationId}";
+            var mgr = new ApplicationActivationManager();
+            mgr.ActivateApplication(aumid, info.Arguments, ActivateOptionsEnum.NoErrorUI, out var processId);
+            return GetProcessById((int) processId, info.Track, info.FilteredImages);
+        }
+
+
+        /// <summary>
+        ///     Creates a new <see cref="WardenProcess"/> from the specified <paramref name="processId"/>.
+        /// </summary>
+        /// <param name="processId">The system-unique identifier of a process resource.</param>
+        /// <param name="trackProcessTree">
+        ///     If set to true the newly created <see cref="WardenProcess"/> will have its process family tree
+        ///     tracked.
+        /// </param>
+        /// <param name="filteredImages">
+        ///     A collection of process image names that will not be added as children to the created
+        ///     <see cref="WardenProcess"/> when tracking is enabled.
+        /// </param>
+        /// <exception cref="ArgumentException">
+        ///     The process specified by the <paramref name="processId"/> parameter is not running
+        ///     or can't be accessed.
+        /// </exception>
+        /// <returns>A <see cref="WardenProcess"/> instance that is associated with the <paramref name="processId"/> parameter.</returns>
+        public static WardenProcess? GetProcessById(int processId, bool trackProcessTree, IEnumerable<string>? filteredImages = null)
+        {
+            var process = new WardenProcess(ProcessNative.GetProcessInfoById(processId), filteredImages);
+            if (!trackProcessTree)
+            {
                 return process;
             }
-            ManagedProcesses.TryRemove(key, out var _);
-            return null;
+            SystemProcessMonitor.TrackProcessFamily(process);
+            return process;
         }
 
-
-        private static WardenProcess BuildTreeById(int pId, List<ProcessFilter> filters, string processPath, List<string> commandLine)
-        {
-            try
-            {
-                Process process = null;
-                try
-                {
-                    process = Process.GetProcessById(pId);
-                }
-                catch
-                {
-                    process = Process.GetProcesses().FirstOrDefault(it => it.Id == pId);
-                }
-
-                if (process == null)
-                {
-                    return null;
-                }
-                var processName = process.ProcessName;
-                var processId = process.Id;
-                var path = processPath ?? GetProcessPath(processId);
-                var state = process.HasExited ? ProcessState.Dead : ProcessState.Alive;
-                var arguments = commandLine ?? GetCommandLine(processId);
-                var warden = new WardenProcess(processName, processId, path, state, arguments, filters);
-                return warden;
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
 
         /// <summary>
-        /// Creates a WardenProcess from a process id and sets a parent.
+        /// Gets a new <see cref="WardenProcess"/> and associates it with the currently active process.
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="parentId"></param>
-        /// <param name="id"></param>
-        /// <param name="path"></param>
-        /// <param name="commandLineArguments"></param>
-        /// <param name="filters">A list of filters so certain processes are not added to the tree.</param>
-        /// <returns>A WardenProcess that will be added to a child list.</returns>
-        internal static WardenProcess CreateProcessFromId(string name, int parentId, int id, string path,
-            List<string> commandLineArguments,
-            List<ProcessFilter> filters)
-        {
-            
-            WardenProcess warden;
-            try
-            {
-                var process = Process.GetProcessById(id);
-                var processName = process.ProcessName;
-                var processId = process.Id;
-                var state = process.HasExited ? ProcessState.Dead : ProcessState.Alive;
-                warden = new WardenProcess(processName, processId, path, state, commandLineArguments, filters);
-                warden.SetParent(parentId);
-                return warden;
-            }
-            catch
-            {
-                //
-            }
-            warden = new WardenProcess(name, id, path, ProcessState.Dead, commandLineArguments, filters);
-            warden.SetParent(parentId);
-            return warden;
-        }
+        /// <returns>A new <see cref="WardenProcess"/> associated with the process information of the calling application.</returns>
+        public static WardenProcess GetCurrentProcess() => new(ProcessNative.GetCurrentProcessInfo());
 
-        #endregion
+    #endregion
     }
 }

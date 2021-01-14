@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Warden.Windows.Uwp
+namespace Warden.Windows
 {
     [Flags]
     internal enum ActivateOptionsEnum
