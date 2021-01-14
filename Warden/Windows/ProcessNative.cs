@@ -144,10 +144,6 @@ namespace Warden.Windows
             for (var i = 0; i < processIds.Length; i++)
             {
                 var processId = processIds[i];
-                if (processId == 1148)
-                {
-                    File.WriteAllText("C:\\Users\\Andrew\\warden\\TestApp\\bin\\x64\\Debug\\net472\\hit.log", "here");
-                }
                 // Obtain a process handle with only ProcessQueryLimitedInformation and ProcessVMRead access.
                 // anything greater and the calling process must be elevated.
                 using var processHandle = OpenProcessHandle(ProcessAccessFlags.QueryLimitedInformation | ProcessAccessFlags.VMRead, (int) processId);
