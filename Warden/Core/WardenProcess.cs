@@ -325,11 +325,17 @@ namespace Warden.Core
                 _onChildExit(child, exitCode);
                 if (HasTreeExited)
                 {
-                    // All descendant processes have stopped execution so we clean up the event subscribers.
-                    // Realistically a child process would not be added long after all others have exited.
-                    foreach (var d in _onChildExit.GetInvocationList())
+                    if (_onChildExit?.GetInvocationList() is { Length: > 0} delegates)
                     {
-                        _onChildExit -= d as EventHandler<int>;
+                        // All descendant processes have stopped execution so we clean up the event subscribers.
+                        // Realistically a child process would not be added long after all others have exited.
+                        foreach (var d in delegates)
+                        {
+                            if (_onChildExit is not null)
+                            {
+                                _onChildExit -= d as EventHandler<int>;
+                            }
+                        }
                     }
                     _onChildExit = null;
                 }
