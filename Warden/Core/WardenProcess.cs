@@ -122,7 +122,7 @@ namespace Warden.Core
         }
 
         /// <summary>
-        ///     Indicates if the current process and all of its children have stopped executing.
+        ///     Indicates if the current process and all processes descendant from it children have stopped executing.
         /// </summary>
         /// <exception cref="SystemException">
         ///     Thrown when no process ID has been set on the current or a child process, and a Handle from which the ID property
@@ -133,23 +133,22 @@ namespace Warden.Core
         {
             get
             {
+                // If the current application process is calling this then we can just return false
                 if (_isCurrentProcess)
                 {
                     return false;
                 }
-                // We don't need to check all the children if the parent is still alive.
-                if (!HasExited)
+                // First things first we check on the kids.
+                if (Children is {Count: > 0})
                 {
-                    return false;
+                    // If any of the children or their grandchildren (and so on and so forth) is still kicking that means the tree has not exited.
+                    if (Children.Any(child => !child.HasExited || !child.HasTreeExited))
+                    {
+                        return false;
+                    }
                 }
-                // Now that the current process has exited lets check the children.
-                // IF there are zero children the tree has fully exited.
-                if (Children is null)
-                {
-                    return true;
-                }
-                //  Recursively check child processes until we reach the end of the process family tree.
-                return Children.Count == 0 || Children.Any(c => c.HasTreeExited is false);
+                // If there are no children or they've all gone to live on a farm check if the current WardenProcess has exited.
+                return HasExited;
             }
         }
 
@@ -326,7 +325,8 @@ namespace Warden.Core
                 _onChildExit(child, exitCode);
                 if (HasTreeExited)
                 {
-                    // all descendant processes have stopped execution so we clean up the event subscribers.
+                    // All descendant processes have stopped execution so we clean up the event subscribers.
+                    // Realistically a child process would not be added long after all others have exited.
                     foreach (var d in _onChildExit.GetInvocationList())
                     {
                         _onChildExit -= d as EventHandler<int>;

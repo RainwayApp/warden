@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <Platforms>x64</Platforms>
     <PackageId>Warden.NET</PackageId>
-    <Version>6.0.2</Version>
+    <Version>6.0.3</Version>
     <Authors>Rainway,Inc.</Authors>
     <Description>Warden simplifies launching and managing processes on Windows. Using its dead simple API you can keep track of entire process trees in real-time.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
