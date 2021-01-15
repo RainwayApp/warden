@@ -133,7 +133,7 @@ namespace Warden.Monitor
                     {
                         if (_options.KillTrackedProcesses)
                         {
-                            process.Terminate(_options.RecursiveKill);
+                            process.TryTerminate(_options.RecursiveKill);
                         }
                     }
                 }
@@ -159,35 +159,6 @@ namespace Warden.Monitor
             _monitorThread?.Join();
             _monitorThread = null;
             Running = false;
-        }
-
-
-        /// <summary>
-        ///     Stops tracking the specified <paramref name="processId"/>.
-        /// </summary>
-        /// <param name="processId">The system-unique identifier of a process resource to stop tracking.</param>
-        internal static void Flush(int processId)
-        {
-            if (!Running)
-            {
-                return;
-                //throw new InvalidOperationException($"Cannot flush process '{processId}' as the system monitor is not running.");
-            }
-
-            if (_trackedProcesses is not null)
-            {
-                foreach (var track in _trackedProcesses)
-                {
-                    var key = track.Key;
-                    if (track.Value is {Info: not null} process)
-                    {
-                        if (process.Info.Id == processId)
-                        {
-                            _trackedProcesses.TryRemove(key, out _);
-                        }
-                    }
-                }
-            }
         }
 
         /// <summary>

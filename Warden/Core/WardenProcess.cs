@@ -56,6 +56,19 @@ namespace Warden.Core
         internal MonitorInfo? Monitor { get; private set; }
 
         /// <summary>
+        /// Indicates if the current <see cref="WardenProcess"/> has been disposed.
+        /// </summary>
+        public bool IsDisposed => _disposed;
+
+        /// <summary>
+        /// Indicates if the current <see cref="WardenProcess"/> object is associated with a system process.
+        /// </summary>
+        /// <remarks>
+        /// Check this before accessing members of this class. For example if you call <see cref="HasExited"/> while no system process is associated with the <see cref="WardenProcess"/> it will throw.
+        /// </remarks>
+        public bool HasProcessAssociation => Monitor is null && Info is not null && _watcher is not null;
+
+        /// <summary>
         ///     Gets the value that was specified by the associated process when it was terminated.
         /// </summary>
         /// <exception cref="InvalidOperationException">Thrown when trying to retrieve the exit code before the process has exited.</exception>
@@ -190,6 +203,9 @@ namespace Warden.Core
         /// <summary>
         ///     Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
+        /// <remarks>
+        /// You almost certainly should not call this yourself. It is called automatically when the associated process exit.
+        /// </remarks>
         public void Dispose()
         {
             // Dispose of unmanaged resources.
@@ -248,6 +264,7 @@ namespace Warden.Core
                 }
                 if (Children is not null)
                 {
+                    // once the parent is dead we no longer need to subscribe to events from its children.
                     foreach (var child in Children)
                     {
                         child.Dispose();
@@ -415,16 +432,45 @@ namespace Warden.Core
         }
 
         /// <summary>
-        ///     Sends a termination signal to the underlying system process object.
+        /// Blocks the calling thread until the associated process terminates.
+        /// </summary>
+        /// <param name="milliseconds">The amount of time, in milliseconds, to wait for the associated process to exit. A value of 0 specifies an immediate return, and a value of -1 specifies an infinite wait.</param>
+        /// <exception cref="InvalidOperationException">
+        ///     Thrown when the current <see cref="HasProcessAssociation"/> is false or the <see cref="WardenProcess"/> object is associated with the current application.
+        /// </exception>
+        /// <exception cref="ObjectDisposedException">
+        ///     Thrown when trying to kill a <see cref="WardenProcess"/> that has already
+        ///     been disposed.
+        /// </exception>
+        /// <returns>true if the associated process has exited; otherwise, false.</returns>
+        /// <remarks>To avoid blocking use the <see cref="OnExit"/> event. If you wish to wait on an arbitrary process use <see cref="SystemProcessMonitor.WaitForExit"/></remarks>
+        public bool WaitForExit(int milliseconds = -1)
+        {
+            if (_isCurrentProcess)
+            {
+                throw new InvalidOperationException("This WardenProcess object is associated with the current application and cannot wait on itself to exit.");
+            }
+            if (_disposed)
+            {
+                throw new ObjectDisposedException("This WardenProcess object has been disposed.");
+            }
+            if (!HasProcessAssociation)
+            {
+                throw new InvalidOperationException("There is no system process associated with this WardenProcess object.");
+            }
+            return _watcher!.WaitForExit(milliseconds);
+        }
+
+        /// <summary>
+        ///     Sends a termination signal to the underlying system process object and blocks the calling thread until it has exited.
         /// </summary>
         /// <param name="entireProcessTree">
         ///     If set to true the termination signal will be sent to all processes descendant from the
         ///     current <see cref="WardenProcess"/>.
         /// </param>
         /// <param name="exitCode">An optional exit code to be used by the process and threads terminated as a result of this call. </param>
-        /// <exception cref="NullReferenceException">
-        ///     Thrown when the current <see cref="WardenProcess"/> has a null
-        ///     <see cref="Info"/> property.
+        /// <exception cref="InvalidOperationException">
+        ///     Thrown when the current <see cref="HasProcessAssociation"/> is false or the <see cref="WardenProcess"/> object is associated with the current application.
         /// </exception>
         /// <exception cref="ObjectDisposedException">
         ///     Thrown when trying to kill a <see cref="WardenProcess"/> that has already
@@ -432,20 +478,27 @@ namespace Warden.Core
         /// </exception>
         public void Terminate(bool entireProcessTree, int exitCode = 0)
         {
+            if (_isCurrentProcess)
+            {
+                throw new InvalidOperationException("This WardenProcess object is associated with the current application and cannot terminate itself.");
+            }
             if (_disposed)
             {
-                throw new ObjectDisposedException("The process has been disposed.");
+                throw new ObjectDisposedException("This WardenProcess object has been disposed.");
             }
-            if (Info is null)
+            if (!HasProcessAssociation)
             {
-                throw new NullReferenceException(nameof(Info));
+                throw new InvalidOperationException("There is no system process associated with this WardenProcess object.");
             }
-            ProcessNative.TerminateProcess(Info.Id, exitCode);
+            ProcessNative.TerminateProcess(Info!.Id, exitCode);
             if (entireProcessTree && Children is not null)
             {
                 foreach (var child in Children)
                 {
-                    child.Terminate(entireProcessTree, exitCode);
+                    if (!child.HasExited && !child.IsDisposed)
+                    {
+                        child.Terminate(entireProcessTree, exitCode);
+                    }
                 }
             }
         }

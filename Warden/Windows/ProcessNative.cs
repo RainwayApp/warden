@@ -46,19 +46,20 @@ namespace Warden.Windows
         /// <param name="exitCode"></param>
         internal static void TerminateProcess(int processId, int exitCode)
         {
-            if (IsProcessRunning(processId))
+            if (!IsProcessRunning(processId))
             {
-                using var processHandle = OpenProcessHandle(ProcessAccessFlags.Terminate | ProcessAccessFlags.Synchronize, processId);
-                if (processHandle.IsInvalid)
-                {
-                    throw new UnauthorizedAccessException($"Unable to access handle of process: {Marshal.GetLastWin32Error()}");
-                }
-                if (!TerminateProcess(processHandle, exitCode))
-                {
-                    throw new Win32Exception("Unable to terminate process.");
-                }
-                WaitForSingleObject(processHandle, 0xFFFFFFFF);
+                throw new InvalidOperationException("The process has already exited.");
             }
+            using var processHandle = OpenProcessHandle(ProcessAccessFlags.Terminate | ProcessAccessFlags.Synchronize, processId);
+            if (processHandle.IsInvalid)
+            {
+                throw new UnauthorizedAccessException($"Unable to access handle of process: {Marshal.GetLastWin32Error()}");
+            }
+            if (!TerminateProcess(processHandle, exitCode))
+            {
+                throw new Win32Exception($"Unable to terminate process: {Marshal.GetLastWin32Error()}");
+            }
+            WaitForSingleObject(processHandle, 0xFFFFFFFF);
         }
 
         /// <summary>
