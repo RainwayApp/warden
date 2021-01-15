@@ -67,7 +67,7 @@ namespace Warden.Windows
                         // check to see if we have been signaled.
                         if (ProcessNative.GetExitCodeProcess(_handle, out var exitCode) && exitCode != ProcessNative.STILL_ACTIVE)
                         {
-                            ExitCode = exitCode;
+                            ExitCode = (int) exitCode;
                             _exited = true;
                         }
                         else
@@ -85,7 +85,7 @@ namespace Warden.Windows
                             {
                                 if (ProcessNative.GetExitCodeProcess(_handle, out var lpExitCode))
                                 {
-                                    ExitCode = lpExitCode;
+                                    ExitCode = (int) lpExitCode;
                                 }
                                 _exited = true;
                             }
@@ -171,7 +171,7 @@ namespace Warden.Windows
 
                     if (ProcessNative.GetExitCodeProcess(handle, out var exitCode))
                     {
-                        ExitCode = exitCode;
+                        ExitCode = (int) exitCode;
                     }
                 }
                 else

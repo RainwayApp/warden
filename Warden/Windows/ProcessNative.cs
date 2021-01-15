@@ -55,7 +55,7 @@ namespace Warden.Windows
             {
                 throw new UnauthorizedAccessException($"Unable to access handle of process: {Marshal.GetLastWin32Error()}");
             }
-            if (!TerminateProcess(processHandle, exitCode))
+            if (!TerminateProcess(processHandle, (uint) exitCode))
             {
                 throw new Win32Exception($"Unable to terminate process: {Marshal.GetLastWin32Error()}");
             }
@@ -426,7 +426,7 @@ namespace Warden.Windows
         /// </summary>
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool GetExitCodeProcess([In] SafeProcessHandle hProcess, [Out] out int lpExitCode);
+        internal static extern bool GetExitCodeProcess([In] SafeProcessHandle hProcess, [Out] out uint lpExitCode);
 
 
         /// <summary>
@@ -509,7 +509,7 @@ namespace Warden.Windows
         /// <param name="exitCode">The exit code to be used by the process and threads terminated as a result of this call. </param>
         /// <returns>If the function succeeds, the return value is nonzero.</returns>
         [DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto, SetLastError = true)]
-        private static extern bool TerminateProcess(SafeProcessHandle processHandle, int exitCode);
+        private static extern bool TerminateProcess(SafeProcessHandle processHandle, uint exitCode);
         /// <summary>
         /// Waits until the specified object is in the signaled state or the time-out interval elapses.
         /// </summary>

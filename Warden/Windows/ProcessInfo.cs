@@ -6,7 +6,7 @@ namespace Warden.Windows
     /// <summary>
     ///     Encapsulates information about a system process object.
     /// </summary>
-    public class ProcessInfo : IEquatable<ProcessInfo>
+    public sealed class ProcessInfo : IEquatable<ProcessInfo>
     {
         /// <summary>
         ///     Creates a read-only record of the provided process info.
@@ -16,7 +16,7 @@ namespace Warden.Windows
         /// <param name="image">The name of the executable belonging to the process.</param>
         /// <param name="commandLine">The command-line string passed to the process.</param>
         /// <param name="workingDirectory">The current working directory of the process.</param>
-        /// <param name="creationTime"></param>
+        /// <param name="creationTime">The time at which the process object was created on the system.</param>
         public ProcessInfo(int id,
             int parentProcessId,
             string image,
@@ -31,7 +31,17 @@ namespace Warden.Windows
             WorkingDirectory = workingDirectory;
             Name = Path.GetFileNameWithoutExtension(Image);
             CreationDate = DateTime.FromFileTime(creationTime);
+            if (ProcessNative.ProcessIdToSessionId((uint) Id, out var sessionId ))
+            {
+                SessionId = (int) sessionId;
+            }
         }
+        
+        /// <summary>
+        /// Gets the Terminal Services session identifier for the process.
+        /// </summary>
+        public int SessionId { get; }
+        
         /// <summary>
         /// Gets the date that the process began executing.
         /// </summary>
@@ -99,7 +109,7 @@ namespace Warden.Windows
                 return true;
             }
             return Name == other.Name && Image == other.Image && ParentProcessId == other.ParentProcessId && Id == other.Id && CommandLine == other.CommandLine && WorkingDirectory == other.WorkingDirectory &&
-                CreationDate == other.CreationDate;
+                CreationDate == other.CreationDate && SessionId == other.SessionId;
         }
 
         /// <summary>Determines whether the specified object is equal to the current object.</summary>
@@ -132,15 +142,17 @@ namespace Warden.Windows
             hash ^= CommandLine.GetHashCode();
             hash ^= WorkingDirectory.GetHashCode();
             hash ^= CreationDate.GetHashCode();
+            hash ^= SessionId.GetHashCode();
             return hash;
         }
 
         public static bool operator ==(ProcessInfo left, ProcessInfo right) => Equals(left, right);
 
+
         public static bool operator !=(ProcessInfo left, ProcessInfo right) => !Equals(left, right);
 
         /// <summary>Returns a string that represents the current object.</summary>
         /// <returns>A string that represents the current object.</returns>
-        public override string ToString() => $"ID => {Id}\nName => {Name}\nParent => {ParentProcessId}\nPath => {Image}\nCommandline => {CommandLine}\nWorking Directory => {WorkingDirectory}\nCreation Time => {CreationDate}";
+        public override string ToString() => $"ID => {Id}\nName => {Name}\nParent => {ParentProcessId}\nPath => {Image}\nCommandline => {CommandLine}\nWorking Directory => {WorkingDirectory}\nCreation Time => {CreationDate}\nSession ID => {SessionId}";
     }
 }
