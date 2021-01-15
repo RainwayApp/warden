@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -166,7 +167,7 @@ namespace Warden.Core
         /// <summary>
         ///     A collection of child processes that were spawned by the current process.
         /// </summary>
-        public List<WardenProcess>? Children { get; private set; }
+        public ConcurrentBag<WardenProcess>? Children { get; private set; }
 
 
         /// <summary>
@@ -254,26 +255,6 @@ namespace Warden.Core
                     }
                     _onExit = null;
                 }
-                if (_onChildExit is not null)
-                {
-                    foreach (var d in _onChildExit.GetInvocationList())
-                    {
-                        _onChildExit -= d as EventHandler<int>;
-                    }
-                    _onChildExit = null;
-                }
-                if (Children is not null)
-                {
-                    // once the parent is dead we no longer need to subscribe to events from its children.
-                    foreach (var child in Children)
-                    {
-                        child.Dispose();
-                    }
-                }
-                if (Info is not null)
-                {
-                    //  SystemProcessMonitor.Flush(Info.Id);
-                }
             }
             _disposed = true;
         }
@@ -321,10 +302,6 @@ namespace Warden.Core
         /// </exception>
         internal void AddChild(WardenProcess child)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException("The WardenProcess has been disposed");
-            }
             if (child is null)
             {
                 throw new ArgumentNullException(nameof(child));
@@ -333,8 +310,8 @@ namespace Warden.Core
             {
                 throw new NullReferenceException(nameof(Children));
             }
-            child.OnExit += OnChildProcessExitHandler;
             Children.Add(child);
+            child.OnExit += OnChildProcessExitHandler;
         }
 
 
@@ -347,6 +324,15 @@ namespace Warden.Core
             {
                 var exitCode = child.ExitCode;
                 _onChildExit(child, exitCode);
+                if (HasTreeExited)
+                {
+                    // all descendant processes have stopped execution so we clean up the event subscribers.
+                    foreach (var d in _onChildExit.GetInvocationList())
+                    {
+                        _onChildExit -= d as EventHandler<int>;
+                    }
+                    _onChildExit = null;
+                }
             }
         }
 
@@ -365,7 +351,7 @@ namespace Warden.Core
             // set to null so the system process monitor skips further matching attempts.
             Monitor = null;
             Info = info;
-            Children = new List<WardenProcess>();
+            Children = new ConcurrentBag<WardenProcess>();
             if (ProcessNative.CurrentProcessId == info.Id)
             {
                 _isCurrentProcess = true;

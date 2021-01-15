@@ -6,25 +6,22 @@
     <Nullable>enable</Nullable>
     <Platforms>x64</Platforms>
     <PackageId>Warden.NET</PackageId>
-    <Version>6.0.1</Version>
+    <Version>6.0.2</Version>
     <Authors>Rainway,Inc.</Authors>
     <Description>Warden simplifies launching and managing processes on Windows. Using its dead simple API you can keep track of entire process trees in real-time.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/RainwayApp/warden</PackageProjectUrl>
     <RepositoryUrl>https://github.com/RainwayApp/warden.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Optimize>true</Optimize>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|netcoreapp3.1|x64'">
-    <DocumentationFile>C:\Users\Andrew\warden\Warden\Warden.xml</DocumentationFile>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|netcoreapp3.1|x64'">
-    <DocumentationFile>C:\Users\Andrew\warden\Warden\Warden.xml</DocumentationFile>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DefineConstants>DEBUG;TRACE</DefineConstants>
   </PropertyGroup>
 
