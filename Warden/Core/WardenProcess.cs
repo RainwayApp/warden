@@ -67,7 +67,7 @@ namespace Warden.Core
         /// <remarks>
         /// Check this before accessing members of this class. For example if you call <see cref="HasExited"/> while no system process is associated with the <see cref="WardenProcess"/> it will throw.
         /// </remarks>
-        public bool HasProcessAssociation => Monitor is null && Info is not null && _watcher is not null;
+        public bool HasProcessAssociation => _isCurrentProcess || Monitor is null && Info is not null && _watcher is not null;
 
         /// <summary>
         ///     Gets the value that was specified by the associated process when it was terminated.
